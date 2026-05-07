@@ -1,24 +1,71 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { DONOR_HISTORY, FOUNDATIONS } from "../lib/data";
 import { Badge } from "../components/ui";
+import {
+    getDonorProfile,
+    updateDonorProfile,
+    getDonorDonations,
+    getDonorStats,
+} from "../lib/databaseUtils";
 
 // Sección: Página de perfil del donante ==============================================================================================
 // ─── Donor Profile ─────────────────────────────────────────────────────────────
 export function DonorProfilePage({ setPage, setSelectedFoundation }) {
     const { user } = useAuth();
     const [editing, setEditing] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({ totalDonated: 0, campaignsSupported: 0 });
+    const [donationHistory, setDonationHistory] = useState([]);
     const [form, setForm] = useState({
-        name: user?.name || "María González",
-        location: user?.location || "Cali, Colombia",
-        phone: "+57 311 123 4567",
+        name: "",
+        location: "",
+        phone: "",
         donationType: "Puntual",
         range: "$10.000 - $30.000",
-        causes: ["Educación", "Salud", "Animales", "Medio Ambiente"],
+        causes: ["Educación", "Salud"],
         anon: false,
         notifications: true,
     });
     const [draft, setDraft] = useState(form);
+
+    useEffect(() => {
+        const loadDonorData = async () => {
+            if (!user) return;
+            try {
+                setLoading(true);
+                const [profileData, donorStats, donations] = await Promise.all([
+                    getDonorProfile(user.id),
+                    getDonorStats(user.id),
+                    getDonorDonations(user.id),
+                ]);
+
+                if (profileData) {
+                    const updatedForm = {
+                        name: profileData.full_name || "",
+                        location: `${profileData.city || ""}, ${profileData.country || ""}`.trim(),
+                        phone: profileData.phone || "",
+                        donationType: profileData.donation_type || "Puntual",
+                        range: profileData.donation_range || "$10.000 - $30.000",
+                        causes: profileData.causes_of_interest || ["Educación", "Salud"],
+                        anon: profileData.prefer_anonymity || false,
+                        notifications: profileData.notifications_enabled !== false,
+                    };
+                    setForm(updatedForm);
+                    setDraft(updatedForm);
+                }
+
+                setStats(donorStats || { totalDonated: 0, campaignsSupported: 0 });
+                setDonationHistory(donations || []);
+            } catch (err) {
+                console.error("Error loading donor profile:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadDonorData();
+    }, [user]);
+
     const setD = (key) => (val) => setDraft((d) => ({ ...d, [key]: val }));
     const toggleCause = (c) =>
         setDraft((d) => ({
@@ -28,9 +75,27 @@ export function DonorProfilePage({ setPage, setSelectedFoundation }) {
                 : [...d.causes, c],
         }));
 
-    const saveEdit = () => {
-        setForm(draft);
-        setEditing(false);
+    const saveEdit = async () => {
+        try {
+            if (user) {
+                await updateDonorProfile(user.id, {
+                    full_name: draft.name,
+                    city: draft.location.split(",")[0]?.trim() || "",
+                    country: draft.location.split(",")[1]?.trim() || "",
+                    phone: draft.phone,
+                    donation_type: draft.donationType,
+                    donation_range: draft.range,
+                    causes_of_interest: draft.causes,
+                    prefer_anonymity: draft.anon,
+                    notifications_enabled: draft.notifications,
+                });
+            }
+            setForm(draft);
+            setEditing(false);
+        } catch (err) {
+            console.error("Error updating profile:", err);
+            alert("Error al actualizar el perfil");
+        }
     };
     const cancelEdit = () => {
         setDraft(form);
@@ -235,12 +300,17 @@ export function DonorProfilePage({ setPage, setSelectedFoundation }) {
 
             {/* Stats */}
             <h2 className="text-xl font-bold text-gray-900 mb-4">Resumen</h2>
+            {loading ? (
+                <div className="text-center py-4">
+                    <p className="text-gray-500">Cargando estadísticas...</p>
+                </div>
+            ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                 {[
-                    { label: "Total donado", value: "$245.000" },
-                    { label: "Campañas apoyadas", value: "18" },
-                    { label: "Última donación", value: "15/04/2026" },
-                    { label: "Impacto", value: "120 personas" },
+                    { label: "Total donado", value: `$${stats.totalDonated.toLocaleString("es")}` },
+                    { label: "Campañas apoyadas", value: stats.campaignsSupported },
+                    { label: "Última donación", value: donationHistory.length > 0 ? new Date(donationHistory[0]?.created_at).toLocaleDateString("es") : "N/A" },
+                    { label: "Impacto", value: `${stats.campaignsSupported * 10} personas` },
                 ].map((s) => (
                     <div
                         key={s.label}
@@ -252,6 +322,8 @@ export function DonorProfilePage({ setPage, setSelectedFoundation }) {
                         </p>
                     </div>
                 ))}
+            </div>
+            )}
             </div>
 
             {/* Impact */}
@@ -283,6 +355,11 @@ export function DonorProfilePage({ setPage, setSelectedFoundation }) {
             <h2 className="text-xl font-bold text-gray-900 mb-4">
                 Historial de actividad
             </h2>
+            {loading ? (
+                <div className="text-center py-4">
+                    <p className="text-gray-500">Cargando historial...</p>
+                </div>
+            ) : (
             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm mb-8">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -305,33 +382,42 @@ export function DonorProfilePage({ setPage, setSelectedFoundation }) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {DONOR_HISTORY.map((row, i) => (
-                                <tr key={i} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 font-medium text-gray-900">
-                                        {row.campaign}
-                                    </td>
-                                    <td className="px-4 py-3 text-gray-600">
-                                        {row.item}
-                                    </td>
-                                    <td className="px-4 py-3 text-gray-500">
-                                        {row.date}
-                                    </td>
-                                    <td className="px-4 py-3 font-semibold text-gray-900">
-                                        ${row.amount.toLocaleString("es")}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span
-                                            className={`px-2 py-1 rounded-full text-xs font-medium ${row.status === "Entregado" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}
-                                        >
-                                            {row.status}
-                                        </span>
+                            {donationHistory.length === 0 ? (
+                                <tr>
+                                    <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
+                                        No hay donaciones registradas
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                donationHistory.map((donation, i) => (
+                                    <tr key={i} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 font-medium text-gray-900">
+                                            {donation.campaign_title || "Campaña"}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-600">
+                                            {donation.item_name || "Ítem"}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-500">
+                                            {new Date(donation.created_at).toLocaleDateString("es")}
+                                        </td>
+                                        <td className="px-4 py-3 font-semibold text-gray-900">
+                                            ${Number(donation.amount).toLocaleString("es")}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span
+                                                className={`px-2 py-1 rounded-full text-xs font-medium ${donation.status === "confirmed" ? "bg-green-100 text-green-700" : donation.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-700"}`}
+                                            >
+                                                {donation.status === "confirmed" ? "Completado" : donation.status === "pending" ? "Pendiente" : donation.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
             </div>
+            )}
 
             {/* Preferences */}
             <h2 className="text-xl font-bold text-gray-900 mb-4">

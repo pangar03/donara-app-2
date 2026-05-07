@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { FOUNDATIONS, CAMPAIGNS } from "../lib/data";
+import { useState, useEffect } from "react";
+import { CAMPAIGNS } from "../lib/data";
 import {
     Badge,
     ProgressBar,
@@ -7,6 +7,11 @@ import {
     FilterIcon,
     CheckCircleIcon,
 } from "../components/ui";
+import {
+    getVerifiedFoundations,
+    getFoundationById,
+    getActiveCampaigns,
+} from "../lib/databaseUtils";
 
 // Seccion 1: Listado de fundaciones
 // Esta sección muestra un listado de fundaciones con un buscador y filtros. Al hacer click en una fundación, se muestra su perfil público.
@@ -19,11 +24,32 @@ export function FoundationsPage({
     setSelectedCampaign,
 }) {
     const [search, setSearch] = useState("");
-    const filtered = FOUNDATIONS.filter(
-        (f) =>
-            f.name.toLowerCase().includes(search.toLowerCase()) ||
-            f.category.toLowerCase().includes(search.toLowerCase()),
-    );
+    const [foundations, setFoundations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        const loadFoundations = async () => {
+            try {
+                setLoading(true);
+                const data = await getVerifiedFoundations(search);
+                setFoundations(data || []);
+            } catch (err) {
+                console.error("Error loading foundations:", err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const debounceTimer = setTimeout(() => {
+            loadFoundations();
+        }, 300);
+
+        return () => clearTimeout(debounceTimer);
+    }, [search]);
+
+    const filtered = foundations;
 
     return (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -49,6 +75,21 @@ export function FoundationsPage({
                 </button>
             </div>
 
+            {loading && (
+                <div className="text-center py-8">
+                    <p className="text-gray-500">Cargando fundaciones...</p>
+                </div>
+            )}
+            {error && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                    <p className="text-red-700 text-sm">Error cargando fundaciones: {error}</p>
+                </div>
+            )}
+            {!loading && filtered.length === 0 && (
+                <div className="text-center py-8">
+                    <p className="text-gray-500">No se encontraron fundaciones</p>
+                </div>
+            )}
             <div className="space-y-4">
                 {filtered.map((f) => (
                     <FoundationListCard
@@ -85,15 +126,15 @@ function FoundationListCard({ foundation: f, onClick }) {
             <div className="flex items-start gap-4">
                 <div
                     className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
-                    style={{ backgroundColor: f.color }}
+                    style={{ backgroundColor: f.color || "#1d4ed8" }}
                 >
-                    {f.initials}
+                    {f.initials || f.legal_name?.substring(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                         <div>
                             <h3 className="font-bold text-gray-900 flex items-center gap-1.5">
-                                {f.name}
+                                {f.legal_name || f.name}
                                 {f.verified && (
                                     <CheckCircleIcon className="w-4 h-4 text-blue-600" />
                                 )}
@@ -104,7 +145,7 @@ function FoundationListCard({ foundation: f, onClick }) {
                             <div className="flex items-center gap-2 mt-1.5">
                                 <Badge label={f.category} />
                                 <span className="text-xs text-gray-400">
-                                    • {f.coverage}
+                                    • {f.coverage || "Local"}
                                 </span>
                             </div>
                         </div>
@@ -118,10 +159,10 @@ function FoundationListCard({ foundation: f, onClick }) {
                     <div className="grid grid-cols-3 gap-4 mt-4">
                         <div>
                             <p className="text-xs text-gray-400">
-                                Campañas activas
+                                Campañas ejecutadas
                             </p>
                             <p className="font-bold text-gray-900">
-                                {f.activeCampaigns}
+                                {f.campaigns_executed || 0}
                             </p>
                         </div>
                         <div>
@@ -129,14 +170,14 @@ function FoundationListCard({ foundation: f, onClick }) {
                                 Beneficiarios
                             </p>
                             <p className="font-bold text-gray-900">
-                                {f.totalBeneficiaries.toLocaleString("es")}
+                                {(f.total_beneficiaries || 0).toLocaleString("es")}
                             </p>
                         </div>
                         <div>
                             <p className="text-xs text-gray-400">
                                 Transparencia
                             </p>
-                            <TransparencyBar level={f.transparency} />
+                            <TransparencyBar level={f.transparency || "Media"} />
                         </div>
                     </div>
                     <button
@@ -157,7 +198,33 @@ export function FoundationPublicProfile({
     setPage,
     setSelectedCampaign,
 }) {
-    const campaigns = CAMPAIGNS.filter((c) => c.foundation_id === f.id);
+    const [foundation, setFoundation] = useState(f);
+    const [campaigns, setCampaigns] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadFoundationData = async () => {
+            try {
+                setLoading(true);
+                // Load full foundation data and campaigns
+                const [foundationData, campaignsData] = await Promise.all([
+                    getFoundationById(f.id),
+                    getActiveCampaigns("", null).then(data =>
+                        (data || []).filter(c => c.foundation_id === f.id)
+                    ),
+                ]);
+                setFoundation(foundationData);
+                setCampaigns(campaignsData);
+            } catch (err) {
+                console.error("Error loading foundation:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadFoundationData();
+    }, [f.id]);
+
+    const displayFoundation = foundation || f;
 
     return (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
@@ -165,27 +232,34 @@ export function FoundationPublicProfile({
                 Perfil de Fundación
             </div>
 
+            {loading && (
+                <div className="text-center py-8">
+                    <p className="text-gray-500">Cargando información de la fundación...</p>
+                </div>
+            )}
+            {!loading && (
+            <>
             {/* Header */}
             <div className="bg-gray-50 rounded-2xl p-6 mb-6 flex items-center gap-5">
                 <div
                     className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-white"
-                    style={{ backgroundColor: f.color }}
+                    style={{ backgroundColor: displayFoundation.color || "#1d4ed8" }}
                 >
-                    <span className="text-3xl font-bold">{f.initials[0]}</span>
+                    <span className="text-3xl font-bold">{(displayFoundation.initials || displayFoundation.legal_name || "")[0]}</span>
                 </div>
                 <div className="flex-1">
                     <div className="flex items-center gap-2">
                         <h1 className="text-2xl font-bold text-gray-900">
-                            {f.name}
+                            {displayFoundation.legal_name || displayFoundation.name}
                         </h1>
-                        {f.verified && (
+                        {displayFoundation.verified && (
                             <CheckCircleIcon className="w-5 h-5 text-blue-600" />
                         )}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                        <Badge label={f.category} />
+                        <Badge label={displayFoundation.category} />
                         <span className="text-sm text-gray-500">
-                            • {f.location}
+                            • {displayFoundation.city ? `${displayFoundation.city}, ${displayFoundation.country}` : "Local"}
                         </span>
                     </div>
                     <div className="flex gap-3 mt-3">
@@ -205,12 +279,12 @@ export function FoundationPublicProfile({
                     Sobre nosotros
                 </h2>
                 <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                    {f.description}
+                    {displayFoundation.description}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
-                        { label: "Misión", value: f.mission },
-                        { label: "Visión", value: f.vision },
+                        { label: "Misión", value: displayFoundation.description || "" },
+                        { label: "Visión", value: displayFoundation.description || "" },
                     ].map((item) => (
                         <div key={item.label}>
                             <p className="text-sm font-semibold text-gray-900">
@@ -231,9 +305,9 @@ export function FoundationPublicProfile({
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
-                        { label: "Cobertura", value: f.coverage },
-                        { label: "Contacto", value: f.contact },
-                        { label: "Sitio web", value: f.website, link: true },
+                        { label: "Cobertura", value: displayFoundation.coverage || "Local" },
+                        { label: "Contacto", value: displayFoundation.institutional_email || displayFoundation.contact || "" },
+                        { label: "Sitio web", value: displayFoundation.website || "", link: true },
                         { label: "Redes sociales", value: null, social: true },
                     ].map((item, i) => (
                         <div
@@ -280,16 +354,16 @@ export function FoundationPublicProfile({
                     {[
                         {
                             label: "Beneficiarios",
-                            value: f.beneficiaries.toLocaleString("es"),
+                            value: (displayFoundation.total_beneficiaries || 0).toLocaleString("es"),
                         },
                         {
                             label: "Campañas ejecutadas",
-                            value: f.campaigns_executed,
+                            value: displayFoundation.campaigns_executed || 0,
                         },
-                        { label: "Recursos entregados", value: f.resources },
+                        { label: "Recursos entregados", value: displayFoundation.resources || "N/A" },
                         {
                             label: "Transparencia",
-                            value: f.transparency,
+                            value: displayFoundation.transparency || "Media",
                             special: true,
                         },
                     ].map((s) => (
@@ -404,8 +478,8 @@ export function FoundationPublicProfile({
                         </div>
                     </section>
                 );
-            })()}
-
+            })()}            </>
+            )}
             {/* Reports */}
             <section>
                 <h2 className="text-xl font-bold text-gray-900 mb-4">

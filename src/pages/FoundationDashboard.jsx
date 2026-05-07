@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { DONATION_ITEMS, CAMPAIGNS } from "../lib/data";
 import {
     Badge,
     Toggle,
@@ -13,11 +12,65 @@ import {
     CloseIcon,
     CheckCircleIcon,
 } from "../components/ui";
+import {
+    getFoundationCampaigns,
+    getFoundationItems,
+    createDonationItem,
+    updateDonationItem,
+    deleteDonationItem,
+    toggleDonationItem,
+    getFoundationProfile,
+    getCampaignDonations,
+} from "../lib/databaseUtils";
 
 // Seccion 1: Dashboard principal de la fundación, con estadísticas, acceso rápido a secciones clave y vista previa de campañas activas. Desde aquí la fundación puede navegar a la gestión de campañas, ítems de donación y perfil. =============================================
 // ─── Foundation Home / Dashboard ───────────────────────────────────────────────
 export function FoundationHome({ setPage }) {
     const { user } = useAuth();
+    const [campaigns, setCampaigns] = useState([]);
+    const [stats, setStats] = useState({
+        totalRecaudado: 0,
+        campaignasActivas: 0,
+        itemsCount: 0,
+        donantesTotales: 0,
+    });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadFoundationData = async () => {
+            if (!user?.id) return;
+            try {
+                setLoading(true);
+                const [campaignsData, itemsData, foundationData] = await Promise.all([
+                    getFoundationCampaigns(user.id),
+                    getFoundationItems(user.id),
+                    getFoundationProfile(user.id),
+                ]);
+
+                setCampaigns(campaignsData || []);
+
+                // Calculate stats
+                const activeCampaigns = (campaignsData || []).filter(c => c.status === "active" || !c.status).length;
+                const totalRaised = (campaignsData || []).reduce((sum, c) => sum + (c.raised || 0), 0);
+                const totalDonors = new Set(
+                    (campaignsData || []).flatMap(c => c.donor_count || 0)
+                ).size;
+
+                setStats({
+                    totalRecaudado: totalRaised,
+                    campaignasActivas: activeCampaigns,
+                    itemsCount: (itemsData || []).length,
+                    donantesTotales: totalDonors,
+                });
+            } catch (err) {
+                console.error("Error loading foundation data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadFoundationData();
+    }, [user?.id]);
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
             {/* Welcome */}
@@ -42,22 +95,22 @@ export function FoundationHome({ setPage }) {
                 {[
                     {
                         label: "Total recaudado",
-                        value: "$67.000",
+                        value: `$${stats.totalRecaudado.toLocaleString("es")}`,
                         color: "text-blue-600",
                     },
                     {
                         label: "Campañas activas",
-                        value: "3",
+                        value: stats.campaignasActivas,
                         color: "text-gray-900",
                     },
                     {
                         label: "Ítems de donación",
-                        value: "4",
+                        value: stats.itemsCount,
                         color: "text-gray-900",
                     },
                     {
                         label: "Donantes totales",
-                        value: "342",
+                        value: stats.donantesTotales,
                         color: "text-gray-900",
                     },
                 ].map((s) => (
@@ -115,45 +168,51 @@ export function FoundationHome({ setPage }) {
                 Campañas activas
             </h2>
             <div className="space-y-3">
-                {CAMPAIGNS.filter((c) => c.foundation_id === 1).map((c) => {
-                    const pct = Math.round((c.raised / c.goal) * 100);
-                    return (
-                        <div
-                            key={c.id}
-                            className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-5"
-                        >
-                            <img
-                                src={c.image}
-                                alt={c.title}
-                                className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
-                            />
-                            <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-gray-900 truncate">
-                                    {c.title}
-                                </p>
-                                <ProgressBar
-                                    percent={pct}
-                                    className="mt-2 mb-1"
+                {loading ? (
+                    <p className="text-gray-500">Cargando campañas...</p>
+                ) : campaigns.length === 0 ? (
+                    <p className="text-gray-500">No hay campañas activas</p>
+                ) : (
+                    campaigns.map((c) => {
+                        const pct = Math.round(((c.raised || 0) / (c.goal || 1)) * 100);
+                        return (
+                            <div
+                                key={c.id}
+                                className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-5"
+                            >
+                                <img
+                                    src={c.image || c.cover_image || "https://via.placeholder.com/56"}
+                                    alt={c.title}
+                                    className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
                                 />
-                                <div className="flex justify-between text-xs text-gray-500">
-                                    <span>
-                                        ${c.raised.toLocaleString("es")}{" "}
-                                        recaudados
-                                    </span>
-                                    <span>{pct}%</span>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-gray-900 truncate">
+                                        {c.title}
+                                    </p>
+                                    <ProgressBar
+                                        percent={pct}
+                                        className="mt-2 mb-1"
+                                    />
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                        <span>
+                                            ${(c.raised || 0).toLocaleString("es")}{" "}
+                                            recaudados
+                                        </span>
+                                        <span>{pct}%</span>
+                                    </div>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                    <p className="text-xs text-gray-400">
+                                        Donantes
+                                    </p>
+                                    <p className="font-bold text-gray-900">
+                                        {c.donor_count || 0}
+                                    </p>
                                 </div>
                             </div>
-                            <div className="text-right flex-shrink-0">
-                                <p className="text-xs text-gray-400">
-                                    Donantes
-                                </p>
-                                <p className="font-bold text-gray-900">
-                                    {c.donors}
-                                </p>
-                            </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })
+                )}
             </div>
         </div>
     );
@@ -161,26 +220,69 @@ export function FoundationHome({ setPage }) {
 
 // ─── Manage Donation Items ──────────────────────────────────────────────────────
 export function ManageItemsPage() {
-    const [items, setItems] = useState(DONATION_ITEMS);
+    const { user } = useAuth();
+    const [items, setItems] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [openMenu, setOpenMenu] = useState(null);
     const [deleteConfirm, setDeleteConfirm] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
-    const toggleActive = (id) =>
-        setItems((prev) =>
-            prev.map((i) => (i.id === id ? { ...i, active: !i.active } : i)),
-        );
-    const deleteItem = (id) => {
-        setItems((prev) => prev.filter((i) => i.id !== id));
-        setDeleteConfirm(null);
+    useEffect(() => {
+        const loadItems = async () => {
+            if (!user?.id) return;
+            try {
+                setLoading(true);
+                const data = await getFoundationItems(user.id);
+                setItems(data || []);
+            } catch (err) {
+                console.error("Error loading items:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadItems();
+    }, [user?.id]);
+
+    const toggleActive = async (id) => {
+        const item = items.find(i => i.id === id);
+        if (!item) return;
+        try {
+            await toggleDonationItem(id, !item.active);
+            setItems(items.map(i => i.id === id ? { ...i, active: !i.active } : i));
+        } catch (err) {
+            console.error("Error toggling item:", err);
+        }
     };
-    const duplicateItem = (item) => {
-        setItems((prev) => [
-            ...prev,
-            { ...item, id: Date.now(), name: item.name + " (copia)" },
-        ]);
-        setOpenMenu(null);
+
+    const deleteItem = async (id) => {
+        try {
+            await deleteDonationItem(id);
+            setItems(items.filter(i => i.id !== id));
+            setDeleteConfirm(null);
+        } catch (err) {
+            console.error("Error deleting item:", err);
+        }
+    };
+
+    const duplicateItem = async (item) => {
+        try {
+            setSaving(true);
+            const newItem = {
+                ...item,
+                name: item.name + " (copia)",
+                active: true,
+            };
+            delete newItem.id;
+            const created = await createDonationItem(user.id, newItem);
+            setItems([...items, created]);
+            setOpenMenu(null);
+        } catch (err) {
+            console.error("Error duplicating item:", err);
+        } finally {
+            setSaving(false);
+        }
     };
 
     const openCreate = () => {
@@ -193,25 +295,27 @@ export function ManageItemsPage() {
         setOpenMenu(null);
     };
 
-    const saveItem = (data) => {
-        if (editItem) {
-            setItems((prev) =>
-                prev.map((i) => (i.id === editItem.id ? { ...i, ...data } : i)),
-            );
-        } else {
-            setItems((prev) => [
-                ...prev,
-                {
-                    id: Date.now(),
-                    foundation_id: 1,
+    const saveItem = async (data) => {
+        try {
+            setSaving(true);
+            if (editItem) {
+                await updateDonationItem(editItem.id, data);
+                setItems(items.map(i => i.id === editItem.id ? { ...i, ...data } : i));
+            } else {
+                const created = await createDonationItem(user.id, {
                     ...data,
                     active: true,
-                    updated: new Date().toLocaleDateString("es"),
-                },
-            ]);
+                });
+                setItems([...items, created]);
+            }
+            setShowModal(false);
+            setEditItem(null);
+        } catch (err) {
+            console.error("Error saving item:", err);
+            alert("Error al guardar el ítem. Por favor intenta de nuevo.");
+        } finally {
+            setSaving(false);
         }
-        setShowModal(false);
-        setEditItem(null);
     };
 
     return (
@@ -236,6 +340,15 @@ export function ManageItemsPage() {
 
             {/* Table */}
             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                {loading ? (
+                    <div className="p-8 text-center">
+                        <p className="text-gray-500">Cargando ítems...</p>
+                    </div>
+                ) : items.length === 0 ? (
+                    <div className="p-8 text-center">
+                        <p className="text-gray-500">No hay ítems de donación creados</p>
+                    </div>
+                ) : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="border-b border-gray-100">
@@ -269,10 +382,10 @@ export function ManageItemsPage() {
                                         {item.tag && <Badge label={item.tag} />}
                                     </td>
                                     <td className="px-4 py-4">
-                                        <Badge label={item.category} />
+                                        <Badge label={item.category || "Otros"} />
                                     </td>
                                     <td className="px-4 py-4 font-semibold text-gray-900">
-                                        ${item.price.toLocaleString("es")}
+                                        ${(item.price || 0).toLocaleString("es")}
                                     </td>
                                     <td className="px-4 py-4 text-gray-500 max-w-xs truncate">
                                         {item.impact}
@@ -343,6 +456,7 @@ export function ManageItemsPage() {
                         </tbody>
                     </table>
                 </div>
+                )}
             </div>
 
             {/* Delete confirm */}
