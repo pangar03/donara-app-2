@@ -275,7 +275,9 @@ export function CampaignDetailPage({ campaign, setPage, setSelectedItem }) {
     }, [campaign.id, campaign]);
 
     const displayCampaign = campaignData;
-    const pct = Math.round((displayCampaign.raised / displayCampaign.goal) * 100);
+    const pct = Math.round(
+        (displayCampaign.raised / displayCampaign.goal) * 100,
+    );
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
@@ -292,130 +294,153 @@ export function CampaignDetailPage({ campaign, setPage, setSelectedItem }) {
                 </div>
             )}
             {!loading && (
-            <div className="flex flex-col lg:flex-row gap-8">
-                {/* Left */}
-                <div className="flex-1 min-w-0">
-                    <div className="relative">
-                        <img
-                            src={displayCampaign.image || displayCampaign.cover_image}
-                            alt={displayCampaign.title}
-                            className="w-full h-64 sm:h-80 object-cover rounded-2xl"
-                        />
-                        <div className="absolute top-3 left-3 flex gap-2">
-                            {(displayCampaign.tags || []).map((t) => (
-                                <Badge key={t} label={t} />
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="bg-white border border-gray-100 rounded-2xl p-6 mt-4 shadow-sm">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-sm text-blue-600 font-medium">
-                                {displayCampaign.foundation_name || displayCampaign.foundations?.legal_name}
-                            </span>
-                            <span className="text-gray-300">•</span>
-                            <Badge label={displayCampaign.category} />
-                        </div>
-                        <h1 className="text-2xl font-bold text-gray-900 mb-4">
-                            {displayCampaign.title}
-                        </h1>
-                        <ProgressBar percent={pct} className="mb-3" />
-                        <div className="flex justify-between items-end mb-4">
-                            <div>
-                                <p className="text-2xl font-bold text-blue-600">
-                                    ${(displayCampaign.raised || 0).toLocaleString("es")}
-                                </p>
-                                <p className="text-sm text-gray-400">
-                                    Meta: ${(displayCampaign.goal || 0).toLocaleString("es")}
-                                </p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {pct}%
-                                </p>
-                                <p className="text-sm text-gray-400">
-                                    Completado
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Donors + Deadline */}
-                        <div className="grid grid-cols-2 gap-3 mb-6">
-                            <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-                                <UsersIcon className="w-5 h-5 text-gray-400" />
-                                <div>
-                                    <p className="text-lg font-bold text-gray-900">
-                                        {displayCampaign.donor_count || 0}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                        Donantes
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-                                <CalendarIcon className="w-5 h-5 text-gray-400" />
-                                <div>
-                                    <p className="text-sm font-bold text-gray-900">
-                                        {displayCampaign.deadline || "Abierta"}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                        Fecha límite
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                            Descripción
-                        </h2>
-                        <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                            {displayCampaign.description}
-                        </p>
-
-                        {(displayCampaign.campaign_updates || []).length > 0 && (
-                            <>
-                                <h2 className="text-lg font-semibold text-gray-900 mb-3">
-                                    Actualizaciones
-                                </h2>
-                                <div className="space-y-2">
-                                    {displayCampaign.campaign_updates.map((u, i) => (
-                                        <div
-                                            key={i}
-                                            className="border border-gray-100 rounded-xl p-3"
-                                        >
-                                            <p className="text-xs text-gray-400 mb-1">
-                                                {new Date(u.created_at).toLocaleDateString("es")}
-                                            </p>
-                                            <p className="text-sm text-gray-700">
-                                                {u.update_text}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                {/* Right – Donation items */}
-                <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                        Formas de donar
-                    </h2>
-                    <div className="space-y-4">
-                        {(displayCampaign.donation_items || []).map((item) => (
-                            <DonationItemCard
-                                key={item.id}
-                                item={item}
-                                onClick={() => {
-                                    setSelectedItem({ item, campaign: displayCampaign });
-                                    setPage("confirm-donation");
-                                }}
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* Left */}
+                    <div className="flex-1 min-w-0">
+                        <div className="relative">
+                            <img
+                                src={
+                                    displayCampaign.image ||
+                                    displayCampaign.cover_image
+                                }
+                                alt={displayCampaign.title}
+                                className="w-full h-64 sm:h-80 object-cover rounded-2xl"
                             />
-                        ))}
+                            <div className="absolute top-3 left-3 flex gap-2">
+                                {(displayCampaign.tags || []).map((t) => (
+                                    <Badge key={t} label={t} />
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white border border-gray-100 rounded-2xl p-6 mt-4 shadow-sm">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-sm text-blue-600 font-medium">
+                                    {displayCampaign.foundation_name ||
+                                        displayCampaign.foundations?.legal_name}
+                                </span>
+                                <span className="text-gray-300">•</span>
+                                <Badge label={displayCampaign.category} />
+                            </div>
+                            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                                {displayCampaign.title}
+                            </h1>
+                            <ProgressBar percent={pct} className="mb-3" />
+                            <div className="flex justify-between items-end mb-4">
+                                <div>
+                                    <p className="text-2xl font-bold text-blue-600">
+                                        $
+                                        {(
+                                            displayCampaign.raised || 0
+                                        ).toLocaleString("es")}
+                                    </p>
+                                    <p className="text-sm text-gray-400">
+                                        Meta: $
+                                        {(
+                                            displayCampaign.goal || 0
+                                        ).toLocaleString("es")}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-2xl font-bold text-gray-900">
+                                        {pct}%
+                                    </p>
+                                    <p className="text-sm text-gray-400">
+                                        Completado
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Donors + Deadline */}
+                            <div className="grid grid-cols-2 gap-3 mb-6">
+                                <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+                                    <UsersIcon className="w-5 h-5 text-gray-400" />
+                                    <div>
+                                        <p className="text-lg font-bold text-gray-900">
+                                            {displayCampaign.donor_count || 0}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Donantes
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+                                    <CalendarIcon className="w-5 h-5 text-gray-400" />
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-900">
+                                            {displayCampaign.deadline ||
+                                                "Abierta"}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Fecha límite
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                                Descripción
+                            </h2>
+                            <p className="text-sm text-gray-600 leading-relaxed mb-6">
+                                {displayCampaign.description}
+                            </p>
+
+                            {(displayCampaign.campaign_updates || []).length >
+                                0 && (
+                                <>
+                                    <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                                        Actualizaciones
+                                    </h2>
+                                    <div className="space-y-2">
+                                        {displayCampaign.campaign_updates.map(
+                                            (u, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="border border-gray-100 rounded-xl p-3"
+                                                >
+                                                    <p className="text-xs text-gray-400 mb-1">
+                                                        {new Date(
+                                                            u.created_at,
+                                                        ).toLocaleDateString(
+                                                            "es",
+                                                        )}
+                                                    </p>
+                                                    <p className="text-sm text-gray-700">
+                                                        {u.update_text}
+                                                    </p>
+                                                </div>
+                                            ),
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right – Donation items */}
+                    <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
+                        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                            Formas de donar
+                        </h2>
+                        <div className="space-y-4">
+                            {(displayCampaign.donation_items || []).map(
+                                (item) => (
+                                    <DonationItemCard
+                                        key={item.id}
+                                        item={item}
+                                        onClick={() => {
+                                            setSelectedItem({
+                                                item,
+                                                campaign: displayCampaign,
+                                            });
+                                            setPage("confirm-donation");
+                                        }}
+                                    />
+                                ),
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
             )}
         </div>
     );
@@ -621,7 +646,9 @@ export function ConfirmDonationPage({ data, setPage, onSuccess }) {
                 disabled={loading}
                 className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-base hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                {loading ? "Procesando..." : `Confirmar donación de $${total.toLocaleString("es")}`}
+                {loading
+                    ? "Procesando..."
+                    : `Confirmar donación de $${total.toLocaleString("es")}`}
             </button>
         </div>
     );

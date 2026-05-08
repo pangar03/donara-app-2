@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { CAMPAIGNS } from "../lib/data";
 import {
     Badge,
     ProgressBar,
@@ -82,12 +81,16 @@ export function FoundationsPage({
             )}
             {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                    <p className="text-red-700 text-sm">Error cargando fundaciones: {error}</p>
+                    <p className="text-red-700 text-sm">
+                        Error cargando fundaciones: {error}
+                    </p>
                 </div>
             )}
             {!loading && filtered.length === 0 && (
                 <div className="text-center py-8">
-                    <p className="text-gray-500">No se encontraron fundaciones</p>
+                    <p className="text-gray-500">
+                        No se encontraron fundaciones
+                    </p>
                 </div>
             )}
             <div className="space-y-4">
@@ -170,14 +173,18 @@ function FoundationListCard({ foundation: f, onClick }) {
                                 Beneficiarios
                             </p>
                             <p className="font-bold text-gray-900">
-                                {(f.total_beneficiaries || 0).toLocaleString("es")}
+                                {(f.total_beneficiaries || 0).toLocaleString(
+                                    "es",
+                                )}
                             </p>
                         </div>
                         <div>
                             <p className="text-xs text-gray-400">
                                 Transparencia
                             </p>
-                            <TransparencyBar level={f.transparency || "Media"} />
+                            <TransparencyBar
+                                level={f.transparency || "Media"}
+                            />
                         </div>
                     </div>
                     <button
@@ -209,8 +216,8 @@ export function FoundationPublicProfile({
                 // Load full foundation data and campaigns
                 const [foundationData, campaignsData] = await Promise.all([
                     getFoundationById(f.id),
-                    getActiveCampaigns("", null).then(data =>
-                        (data || []).filter(c => c.foundation_id === f.id)
+                    getActiveCampaigns("", null).then((data) =>
+                        (data || []).filter((c) => c.foundation_id === f.id),
                     ),
                 ]);
                 setFoundation(foundationData);
@@ -234,251 +241,306 @@ export function FoundationPublicProfile({
 
             {loading && (
                 <div className="text-center py-8">
-                    <p className="text-gray-500">Cargando información de la fundación...</p>
+                    <p className="text-gray-500">
+                        Cargando información de la fundación...
+                    </p>
                 </div>
             )}
             {!loading && (
-            <>
-            {/* Header */}
-            <div className="bg-gray-50 rounded-2xl p-6 mb-6 flex items-center gap-5">
-                <div
-                    className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-white"
-                    style={{ backgroundColor: displayFoundation.color || "#1d4ed8" }}
-                >
-                    <span className="text-3xl font-bold">{(displayFoundation.initials || displayFoundation.legal_name || "")[0]}</span>
-                </div>
-                <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-2xl font-bold text-gray-900">
-                            {displayFoundation.legal_name || displayFoundation.name}
-                        </h1>
-                        {displayFoundation.verified && (
-                            <CheckCircleIcon className="w-5 h-5 text-blue-600" />
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                        <Badge label={displayFoundation.category} />
-                        <span className="text-sm text-gray-500">
-                            • {displayFoundation.city ? `${displayFoundation.city}, ${displayFoundation.country}` : "Local"}
-                        </span>
-                    </div>
-                    <div className="flex gap-3 mt-3">
-                        <button className="bg-blue-600 text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-blue-700">
-                            Donar
-                        </button>
-                        <button className="border border-gray-300 text-sm font-medium px-5 py-2 rounded-xl hover:bg-gray-50">
-                            Reportar
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* About */}
-            <section className="mb-8">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">
-                    Sobre nosotros
-                </h2>
-                <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                    {displayFoundation.description}
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                        { label: "Misión", value: displayFoundation.description || "" },
-                        { label: "Visión", value: displayFoundation.description || "" },
-                    ].map((item) => (
-                        <div key={item.label}>
-                            <p className="text-sm font-semibold text-gray-900">
-                                {item.label}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                                {item.value}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* Contact */}
-            <section className="mb-8">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">
-                    Información de contacto
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                        { label: "Cobertura", value: displayFoundation.coverage || "Local" },
-                        { label: "Contacto", value: displayFoundation.institutional_email || displayFoundation.contact || "" },
-                        { label: "Sitio web", value: displayFoundation.website || "", link: true },
-                        { label: "Redes sociales", value: null, social: true },
-                    ].map((item, i) => (
+                <>
+                    {/* Header */}
+                    <div className="bg-gray-50 rounded-2xl p-6 mb-6 flex items-center gap-5">
                         <div
-                            key={i}
-                            className="border border-gray-100 rounded-xl p-4 bg-white"
+                            className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-white"
+                            style={{
+                                backgroundColor:
+                                    displayFoundation.color || "#1d4ed8",
+                            }}
                         >
-                            <p className="text-xs text-gray-400 mb-1">
-                                {item.label}
-                            </p>
-                            {item.social ? (
-                                <div className="flex gap-3">
-                                    {["f", "𝕏", "in"].map((s) => (
-                                        <button
-                                            key={s}
-                                            className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hover:bg-gray-200"
-                                        >
-                                            {s}
-                                        </button>
-                                    ))}
-                                </div>
-                            ) : item.link ? (
-                                <a
-                                    href="#"
-                                    className="text-sm text-blue-600 font-medium"
-                                >
-                                    {item.value}
-                                </a>
-                            ) : (
-                                <p className="text-sm font-medium text-gray-900">
-                                    {item.value}
-                                </p>
-                            )}
+                            <span className="text-3xl font-bold">
+                                {
+                                    (displayFoundation.initials ||
+                                        displayFoundation.legal_name ||
+                                        "")[0]
+                                }
+                            </span>
                         </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* Impact */}
-            <section className="mb-8">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">
-                    Impacto y transparencia
-                </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {[
-                        {
-                            label: "Beneficiarios",
-                            value: (displayFoundation.total_beneficiaries || 0).toLocaleString("es"),
-                        },
-                        {
-                            label: "Campañas ejecutadas",
-                            value: displayFoundation.campaigns_executed || 0,
-                        },
-                        { label: "Recursos entregados", value: displayFoundation.resources || "N/A" },
-                        {
-                            label: "Transparencia",
-                            value: displayFoundation.transparency || "Media",
-                            special: true,
-                        },
-                    ].map((s) => (
-                        <div
-                            key={s.label}
-                            className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm text-center"
-                        >
-                            <p className="text-xs text-gray-400 mb-1">
-                                {s.label}
-                            </p>
-                            {s.special ? (
-                                <div className="flex items-center justify-center gap-1">
-                                    <CheckCircleIcon className="w-4 h-4 text-blue-600" />
-                                    <span className="font-bold text-gray-900">
-                                        {s.value}
-                                    </span>
-                                </div>
-                            ) : (
-                                <p className="text-xl font-bold text-gray-900">
-                                    {s.value}
-                                </p>
-                            )}
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-2xl font-bold text-gray-900">
+                                    {displayFoundation.legal_name ||
+                                        displayFoundation.name}
+                                </h1>
+                                {displayFoundation.verified && (
+                                    <CheckCircleIcon className="w-5 h-5 text-blue-600" />
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                                <Badge label={displayFoundation.category} />
+                                <span className="text-sm text-gray-500">
+                                    •{" "}
+                                    {displayFoundation.city
+                                        ? `${displayFoundation.city}, ${displayFoundation.country}`
+                                        : "Local"}
+                                </span>
+                            </div>
+                            <div className="flex gap-3 mt-3">
+                                <button className="bg-blue-600 text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-blue-700">
+                                    Donar
+                                </button>
+                                <button className="border border-gray-300 text-sm font-medium px-5 py-2 rounded-xl hover:bg-gray-50">
+                                    Reportar
+                                </button>
+                            </div>
                         </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* Active campaigns */}
-            {campaigns.length > 0 && (
-                <section className="mb-8">
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">
-                        Campañas activas
-                    </h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {campaigns.map((c) => {
-                            const pct = Math.round((c.raised / c.goal) * 100);
-                            return (
-                                <div
-                                    key={c.id}
-                                    className="border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                                    onClick={() => {
-                                        setSelectedCampaign(c);
-                                        setPage("campaign-detail");
-                                    }}
-                                >
-                                    <div
-                                        className="h-32 bg-gray-200"
-                                        style={{
-                                            background: `url(${c.image}) center/cover`,
-                                        }}
-                                    />
-                                    <div className="p-4">
-                                        <p className="font-semibold text-gray-900 text-sm leading-snug mb-2">
-                                            {c.title}
-                                        </p>
-                                        <ProgressBar
-                                            percent={pct}
-                                            className="mb-2"
-                                        />
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-gray-500">
-                                                {pct}% completado
-                                            </span>
-                                            <span className="font-semibold text-gray-900">
-                                                ${c.raised.toLocaleString("es")}{" "}
-                                                de $
-                                                {c.goal.toLocaleString("es")}
-                                            </span>
-                                        </div>
-                                        <button className="w-full mt-3 bg-blue-600 text-white text-xs font-semibold py-2 rounded-lg hover:bg-blue-700">
-                                            Ver campaña
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
                     </div>
-                </section>
-            )}
-
-            {/* Donation items — pulled from this foundation's campaigns */}
-            {(() => {
-                const allItems = campaigns
-                    .flatMap((c) => c.items || [])
-                    .slice(0, 3);
-                if (allItems.length === 0) return null;
-                return (
+                    {/* About */}
                     <section className="mb-8">
                         <h2 className="text-xl font-bold text-gray-900 mb-4">
-                            Formas de donar
+                            Sobre nosotros
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            {allItems.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className="border border-gray-100 rounded-2xl p-4 bg-white shadow-sm"
-                                >
-                                    <p className="font-semibold text-gray-900 mb-1">
-                                        {item.name}
+                        <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                            {displayFoundation.description}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {[
+                                {
+                                    label: "Misión",
+                                    value: displayFoundation.description || "",
+                                },
+                                {
+                                    label: "Visión",
+                                    value: displayFoundation.description || "",
+                                },
+                            ].map((item) => (
+                                <div key={item.label}>
+                                    <p className="text-sm font-semibold text-gray-900">
+                                        {item.label}
                                     </p>
-                                    <p className="text-2xl font-bold text-blue-600 mb-1">
-                                        ${item.price.toLocaleString("es")}
+                                    <p className="text-sm text-gray-500">
+                                        {item.value}
                                     </p>
-                                    <p className="text-xs text-gray-500 mb-3">
-                                        {item.impact}
-                                    </p>
-                                    <button className="w-full bg-blue-600 text-white text-sm font-semibold py-2 rounded-xl hover:bg-blue-700">
-                                        Donar
-                                    </button>
                                 </div>
                             ))}
                         </div>
                     </section>
-                );
-            })()}            </>
+                    {/* Contact */}
+                    <section className="mb-8">
+                        <h2 className="text-xl font-bold text-gray-900 mb-4">
+                            Información de contacto
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {[
+                                {
+                                    label: "Cobertura",
+                                    value:
+                                        displayFoundation.coverage || "Local",
+                                },
+                                {
+                                    label: "Contacto",
+                                    value:
+                                        displayFoundation.institutional_email ||
+                                        displayFoundation.contact ||
+                                        "",
+                                },
+                                {
+                                    label: "Sitio web",
+                                    value: displayFoundation.website || "",
+                                    link: true,
+                                },
+                                {
+                                    label: "Redes sociales",
+                                    value: null,
+                                    social: true,
+                                },
+                            ].map((item, i) => (
+                                <div
+                                    key={i}
+                                    className="border border-gray-100 rounded-xl p-4 bg-white"
+                                >
+                                    <p className="text-xs text-gray-400 mb-1">
+                                        {item.label}
+                                    </p>
+                                    {item.social ? (
+                                        <div className="flex gap-3">
+                                            {["f", "𝕏", "in"].map((s) => (
+                                                <button
+                                                    key={s}
+                                                    className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hover:bg-gray-200"
+                                                >
+                                                    {s}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : item.link ? (
+                                        <a
+                                            href="#"
+                                            className="text-sm text-blue-600 font-medium"
+                                        >
+                                            {item.value}
+                                        </a>
+                                    ) : (
+                                        <p className="text-sm font-medium text-gray-900">
+                                            {item.value}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                    {/* Impact */}
+                    <section className="mb-8">
+                        <h2 className="text-xl font-bold text-gray-900 mb-4">
+                            Impacto y transparencia
+                        </h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {[
+                                {
+                                    label: "Beneficiarios",
+                                    value: (
+                                        displayFoundation.total_beneficiaries ||
+                                        0
+                                    ).toLocaleString("es"),
+                                },
+                                {
+                                    label: "Campañas ejecutadas",
+                                    value:
+                                        displayFoundation.campaigns_executed ||
+                                        0,
+                                },
+                                {
+                                    label: "Recursos entregados",
+                                    value: displayFoundation.resources || "N/A",
+                                },
+                                {
+                                    label: "Transparencia",
+                                    value:
+                                        displayFoundation.transparency ||
+                                        "Media",
+                                    special: true,
+                                },
+                            ].map((s) => (
+                                <div
+                                    key={s.label}
+                                    className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm text-center"
+                                >
+                                    <p className="text-xs text-gray-400 mb-1">
+                                        {s.label}
+                                    </p>
+                                    {s.special ? (
+                                        <div className="flex items-center justify-center gap-1">
+                                            <CheckCircleIcon className="w-4 h-4 text-blue-600" />
+                                            <span className="font-bold text-gray-900">
+                                                {s.value}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xl font-bold text-gray-900">
+                                            {s.value}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                    {/* Active campaigns */}
+                    {campaigns.length > 0 && (
+                        <section className="mb-8">
+                            <h2 className="text-xl font-bold text-gray-900 mb-4">
+                                Campañas activas
+                            </h2>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                {campaigns.map((c) => {
+                                    const pct = Math.round(
+                                        (c.raised / c.goal) * 100,
+                                    );
+                                    return (
+                                        <div
+                                            key={c.id}
+                                            className="border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                                            onClick={() => {
+                                                setSelectedCampaign(c);
+                                                setPage("campaign-detail");
+                                            }}
+                                        >
+                                            <div
+                                                className="h-32 bg-gray-200"
+                                                style={{
+                                                    background: `url(${c.image}) center/cover`,
+                                                }}
+                                            />
+                                            <div className="p-4">
+                                                <p className="font-semibold text-gray-900 text-sm leading-snug mb-2">
+                                                    {c.title}
+                                                </p>
+                                                <ProgressBar
+                                                    percent={pct}
+                                                    className="mb-2"
+                                                />
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-gray-500">
+                                                        {pct}% completado
+                                                    </span>
+                                                    <span className="font-semibold text-gray-900">
+                                                        $
+                                                        {c.raised.toLocaleString(
+                                                            "es",
+                                                        )}{" "}
+                                                        de $
+                                                        {c.goal.toLocaleString(
+                                                            "es",
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                <button className="w-full mt-3 bg-blue-600 text-white text-xs font-semibold py-2 rounded-lg hover:bg-blue-700">
+                                                    Ver campaña
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    )}
+                    {/* Donation items — pulled from this foundation's campaigns */}
+                    {(() => {
+                        const allItems = campaigns
+                            .flatMap((c) => c.items || [])
+                            .slice(0, 3);
+                        if (allItems.length === 0) return null;
+                        return (
+                            <section className="mb-8">
+                                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                                    Formas de donar
+                                </h2>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    {allItems.map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className="border border-gray-100 rounded-2xl p-4 bg-white shadow-sm"
+                                        >
+                                            <p className="font-semibold text-gray-900 mb-1">
+                                                {item.name}
+                                            </p>
+                                            <p className="text-2xl font-bold text-blue-600 mb-1">
+                                                $
+                                                {item.price.toLocaleString(
+                                                    "es",
+                                                )}
+                                            </p>
+                                            <p className="text-xs text-gray-500 mb-3">
+                                                {item.impact}
+                                            </p>
+                                            <button className="w-full bg-blue-600 text-white text-sm font-semibold py-2 rounded-xl hover:bg-blue-700">
+                                                Donar
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        );
+                    })()}{" "}
+                </>
             )}
             {/* Reports */}
             <section>

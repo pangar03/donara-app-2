@@ -15,6 +15,11 @@ export const signUpDonor = async ({
     phone,
     city,
     country,
+    dontation_type,
+    donation_range,
+    causes,
+    anonymous,
+    notifications,
 }) => {
     const { data, error } = await supabase.auth.signUp({
         email,
@@ -45,28 +50,28 @@ export const signUpFoundation = async (formData) => {
     const {
         email,
         password,
-        legalName,
+        legal_name,
         initials,
         nit,
-        type,
-        date,
+        foundation_type,
+        founded_date,
         city,
         country,
-        rep,
-        docType,
-        docNum,
-        role: repRole,
+        rep_name,
+        rep_doc_type,
+        rep_doc_number,
+        rep_role,
         phone,
         description,
-        category,
         coverage,
-        beneficiaries,
+        category,
+        beneficiaries_desc,
         website,
-        social,
-        bank,
-        accountType,
-        accountNum,
-        holder,
+        social_handle,
+        bank_name,
+        account_type,
+        account_number,
+        account_holder,
     } = formData;
 
     const { data, error } = await supabase.auth.signUp({
@@ -80,29 +85,29 @@ export const signUpFoundation = async (formData) => {
 
     const { error: profileError } = await supabase.from("foundations").insert({
         user_id: data.user.id,
-        legal_name: legalName,
+        legal_name,
         initials,
         nit,
-        foundation_type: type,
-        founded_date: date || null,
+        foundation_type,
+        founded_date,
         city,
         country,
-        rep_name: rep,
-        rep_doc_type: docType,
-        rep_doc_number: docNum,
-        rep_role: repRole,
+        rep_name,
+        rep_doc_type,
+        rep_doc_number,
+        rep_role,
         institutional_email: email,
         phone,
         description,
         category,
-        coverage: coverage || null,
-        beneficiaries_desc: beneficiaries,
+        coverage,
+        beneficiaries_desc,
         website,
-        social_handle: social,
-        bank_name: bank,
-        account_type: accountType || null,
-        account_number: accountNum,
-        account_holder: holder,
+        social_handle,
+        bank_name,
+        account_type,
+        account_number,
+        account_holder,
     });
     if (profileError) throw profileError;
 
@@ -113,10 +118,12 @@ export const signUpFoundation = async (formData) => {
  * Sign in with email + password
  */
 export const signIn = async (email, password) => {
+    console.log("[databaseUtils] signIn called", { email });
     const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
     });
+    console.log("[databaseUtils] signIn result", { data, error });
     if (error) throw error;
     return data;
 };
@@ -162,21 +169,48 @@ export const signOut = async () => {
 /**
  * Get the current logged-in user + their role from profiles table
  * Returns { user, role } or null if not logged in
+ * role is either "donor" or "foundation"
  */
 export const getCurrentUserWithRole = async () => {
     const {
         data: { user },
     } = await supabase.auth.getUser();
+    console.log(
+        "[databaseUtils] getCurrentUserWithRole supabase.getUser ->",
+        user,
+    );
     if (!user) return null;
 
-    const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
+    // Check if user is a donor
+    const { data: donor, error: donorErr } = await supabase
+        .from("donors")
+        .select("id")
+        .eq("user_id", user.id)
         .single();
+    console.log("[databaseUtils] getCurrentUserWithRole donor query ->", {
+        donor,
+        donorErr,
+    });
+    if (donor) {
+        return { user, role: "donor" };
+    }
 
-    if (error) throw error;
-    return { user, role: profile.role };
+    // Check if user is a foundation
+    const { data: foundation, error: foundationErr } = await supabase
+        .from("foundations")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+    console.log("[databaseUtils] getCurrentUserWithRole foundation query ->", {
+        foundation,
+        foundationErr,
+    });
+    if (foundation) {
+        return { user, role: "foundation" };
+    }
+
+    // User exists but doesn't have a donor or foundation profile
+    return { user, role: null };
 };
 
 /**
@@ -339,16 +373,13 @@ export const getVerifiedFoundations = async (
     searchTerm = "",
     category = null,
 ) => {
-    let query = supabase
-        .from("foundations")
-        .select(
-            `
+    let query = supabase.from("foundations").select(
+        `
       id, legal_name, initials, color, description, category,
       coverage, verified, logo_url, total_beneficiaries,
       campaigns_executed, transparency
     `,
-        )
-        .eq("verified", true);
+    );
 
     if (searchTerm) {
         query = query.or(

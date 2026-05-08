@@ -14,6 +14,9 @@ import {
 } from "../components/ui";
 import {
     getFoundationCampaigns,
+    createCampaign,
+    updateCampaign,
+    deleteCampaign as deleteCampaignById,
     getFoundationItems,
     createDonationItem,
     updateDonationItem,
@@ -41,19 +44,25 @@ export function FoundationHome({ setPage }) {
             if (!user?.id) return;
             try {
                 setLoading(true);
-                const [campaignsData, itemsData, foundationData] = await Promise.all([
-                    getFoundationCampaigns(user.id),
-                    getFoundationItems(user.id),
-                    getFoundationProfile(user.id),
-                ]);
+                const [campaignsData, itemsData, foundationData] =
+                    await Promise.all([
+                        getFoundationCampaigns(user.id),
+                        getFoundationItems(user.id),
+                        getFoundationProfile(user.id),
+                    ]);
 
                 setCampaigns(campaignsData || []);
 
                 // Calculate stats
-                const activeCampaigns = (campaignsData || []).filter(c => c.status === "active" || !c.status).length;
-                const totalRaised = (campaignsData || []).reduce((sum, c) => sum + (c.raised || 0), 0);
+                const activeCampaigns = (campaignsData || []).filter(
+                    (c) => c.status === "active" || !c.status,
+                ).length;
+                const totalRaised = (campaignsData || []).reduce(
+                    (sum, c) => sum + (c.raised || 0),
+                    0,
+                );
                 const totalDonors = new Set(
-                    (campaignsData || []).flatMap(c => c.donor_count || 0)
+                    (campaignsData || []).flatMap((c) => c.donor_count || 0),
                 ).size;
 
                 setStats({
@@ -174,14 +183,20 @@ export function FoundationHome({ setPage }) {
                     <p className="text-gray-500">No hay campañas activas</p>
                 ) : (
                     campaigns.map((c) => {
-                        const pct = Math.round(((c.raised || 0) / (c.goal || 1)) * 100);
+                        const pct = Math.round(
+                            ((c.raised || 0) / (c.goal || 1)) * 100,
+                        );
                         return (
                             <div
                                 key={c.id}
                                 className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-5"
                             >
                                 <img
-                                    src={c.image || c.cover_image || "https://via.placeholder.com/56"}
+                                    src={
+                                        c.image ||
+                                        c.cover_image ||
+                                        "https://via.placeholder.com/56"
+                                    }
                                     alt={c.title}
                                     className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
                                 />
@@ -195,7 +210,10 @@ export function FoundationHome({ setPage }) {
                                     />
                                     <div className="flex justify-between text-xs text-gray-500">
                                         <span>
-                                            ${(c.raised || 0).toLocaleString("es")}{" "}
+                                            $
+                                            {(c.raised || 0).toLocaleString(
+                                                "es",
+                                            )}{" "}
                                             recaudados
                                         </span>
                                         <span>{pct}%</span>
@@ -246,11 +264,15 @@ export function ManageItemsPage() {
     }, [user?.id]);
 
     const toggleActive = async (id) => {
-        const item = items.find(i => i.id === id);
+        const item = items.find((i) => i.id === id);
         if (!item) return;
         try {
             await toggleDonationItem(id, !item.active);
-            setItems(items.map(i => i.id === id ? { ...i, active: !i.active } : i));
+            setItems(
+                items.map((i) =>
+                    i.id === id ? { ...i, active: !i.active } : i,
+                ),
+            );
         } catch (err) {
             console.error("Error toggling item:", err);
         }
@@ -259,7 +281,7 @@ export function ManageItemsPage() {
     const deleteItem = async (id) => {
         try {
             await deleteDonationItem(id);
-            setItems(items.filter(i => i.id !== id));
+            setItems(items.filter((i) => i.id !== id));
             setDeleteConfirm(null);
         } catch (err) {
             console.error("Error deleting item:", err);
@@ -300,7 +322,11 @@ export function ManageItemsPage() {
             setSaving(true);
             if (editItem) {
                 await updateDonationItem(editItem.id, data);
-                setItems(items.map(i => i.id === editItem.id ? { ...i, ...data } : i));
+                setItems(
+                    items.map((i) =>
+                        i.id === editItem.id ? { ...i, ...data } : i,
+                    ),
+                );
             } else {
                 const created = await createDonationItem(user.id, {
                     ...data,
@@ -346,116 +372,128 @@ export function ManageItemsPage() {
                     </div>
                 ) : items.length === 0 ? (
                     <div className="p-8 text-center">
-                        <p className="text-gray-500">No hay ítems de donación creados</p>
+                        <p className="text-gray-500">
+                            No hay ítems de donación creados
+                        </p>
                     </div>
                 ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="border-b border-gray-100">
-                            <tr>
-                                {[
-                                    "Ítem",
-                                    "Categoría",
-                                    "Valor",
-                                    "Impacto",
-                                    "Estado",
-                                    "Disponibles",
-                                    "Actualizado",
-                                    "",
-                                ].map((h) => (
-                                    <th
-                                        key={h}
-                                        className="text-left px-4 py-4 font-medium text-gray-600 text-xs"
-                                    >
-                                        {h}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {items.map((item) => (
-                                <tr key={item.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-4">
-                                        <p className="font-medium text-gray-900">
-                                            {item.name}
-                                        </p>
-                                        {item.tag && <Badge label={item.tag} />}
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <Badge label={item.category || "Otros"} />
-                                    </td>
-                                    <td className="px-4 py-4 font-semibold text-gray-900">
-                                        ${(item.price || 0).toLocaleString("es")}
-                                    </td>
-                                    <td className="px-4 py-4 text-gray-500 max-w-xs truncate">
-                                        {item.impact}
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <Toggle
-                                            checked={item.active}
-                                            onChange={() =>
-                                                toggleActive(item.id)
-                                            }
-                                        />
-                                    </td>
-                                    <td
-                                        className={`px-4 py-4 font-semibold ${item.available === 0 ? "text-red-500" : "text-gray-900"}`}
-                                    >
-                                        {item.available}
-                                    </td>
-                                    <td className="px-4 py-4 text-gray-400 text-xs">
-                                        {item.updated}
-                                    </td>
-                                    <td className="px-4 py-4 relative">
-                                        <button
-                                            onClick={() =>
-                                                setOpenMenu(
-                                                    openMenu === item.id
-                                                        ? null
-                                                        : item.id,
-                                                )
-                                            }
-                                            className="text-gray-400 hover:text-gray-600 p-1 rounded"
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="border-b border-gray-100">
+                                <tr>
+                                    {[
+                                        "Ítem",
+                                        "Categoría",
+                                        "Valor",
+                                        "Impacto",
+                                        "Estado",
+                                        "Disponibles",
+                                        "Actualizado",
+                                        "",
+                                    ].map((h) => (
+                                        <th
+                                            key={h}
+                                            className="text-left px-4 py-4 font-medium text-gray-600 text-xs"
                                         >
-                                            <DotsIcon />
-                                        </button>
-                                        {openMenu === item.id && (
-                                            <div className="absolute right-0 top-8 bg-white border border-gray-100 rounded-xl shadow-lg z-20 py-1 w-36">
-                                                <button
-                                                    onClick={() =>
-                                                        openEdit(item)
-                                                    }
-                                                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                                >
-                                                    <EditIcon /> Editar
-                                                </button>
-                                                <button
-                                                    onClick={() =>
-                                                        duplicateItem(item)
-                                                    }
-                                                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                                >
-                                                    <CopyIcon /> Duplicar
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setDeleteConfirm(
-                                                            item.id,
-                                                        );
-                                                        setOpenMenu(null);
-                                                    }}
-                                                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50"
-                                                >
-                                                    <TrashIcon /> Eliminar
-                                                </button>
-                                            </div>
-                                        )}
-                                    </td>
+                                            {h}
+                                        </th>
+                                    ))}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {items.map((item) => (
+                                    <tr
+                                        key={item.id}
+                                        className="hover:bg-gray-50"
+                                    >
+                                        <td className="px-4 py-4">
+                                            <p className="font-medium text-gray-900">
+                                                {item.name}
+                                            </p>
+                                            {item.tag && (
+                                                <Badge label={item.tag} />
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <Badge
+                                                label={item.category || "Otros"}
+                                            />
+                                        </td>
+                                        <td className="px-4 py-4 font-semibold text-gray-900">
+                                            $
+                                            {(item.price || 0).toLocaleString(
+                                                "es",
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4 text-gray-500 max-w-xs truncate">
+                                            {item.impact}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <Toggle
+                                                checked={item.active}
+                                                onChange={() =>
+                                                    toggleActive(item.id)
+                                                }
+                                            />
+                                        </td>
+                                        <td
+                                            className={`px-4 py-4 font-semibold ${item.available === 0 ? "text-red-500" : "text-gray-900"}`}
+                                        >
+                                            {item.available}
+                                        </td>
+                                        <td className="px-4 py-4 text-gray-400 text-xs">
+                                            {item.updated}
+                                        </td>
+                                        <td className="px-4 py-4 relative">
+                                            <button
+                                                onClick={() =>
+                                                    setOpenMenu(
+                                                        openMenu === item.id
+                                                            ? null
+                                                            : item.id,
+                                                    )
+                                                }
+                                                className="text-gray-400 hover:text-gray-600 p-1 rounded"
+                                            >
+                                                <DotsIcon />
+                                            </button>
+                                            {openMenu === item.id && (
+                                                <div className="absolute right-0 top-8 bg-white border border-gray-100 rounded-xl shadow-lg z-20 py-1 w-36">
+                                                    <button
+                                                        onClick={() =>
+                                                            openEdit(item)
+                                                        }
+                                                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                                    >
+                                                        <EditIcon /> Editar
+                                                    </button>
+                                                    <button
+                                                        onClick={() =>
+                                                            duplicateItem(item)
+                                                        }
+                                                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                                    >
+                                                        <CopyIcon /> Duplicar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setDeleteConfirm(
+                                                                item.id,
+                                                            );
+                                                            setOpenMenu(null);
+                                                        }}
+                                                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50"
+                                                    >
+                                                        <TrashIcon /> Eliminar
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 
@@ -670,12 +708,13 @@ function ItemFormModal({ initial, onSave, onClose }) {
 
 // ─── Manage Campaigns ──────────────────────────────────────────────────────────
 export function ManageCampaignsPage() {
-    const [campaigns, setCampaigns] = useState(
-        CAMPAIGNS.filter((c) => c.foundation_id === 1),
-    );
+    const { user } = useAuth();
+    const [campaigns, setCampaigns] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [showCreate, setShowCreate] = useState(false);
     const [editCampaign, setEditCampaign] = useState(null); // campaign being edited
-    const [deleteCampaign, setDeleteCampaign] = useState(null); // campaign pending delete confirm
+    const [campaignToDelete, setCampaignToDelete] = useState(null); // campaign pending delete confirm
     const [newCampaign, setNewCampaign] = useState({
         title: "",
         category: "",
@@ -687,47 +726,96 @@ export function ManageCampaignsPage() {
     const setE = (key) => (val) =>
         setEditCampaign((c) => ({ ...c, [key]: val }));
 
-    const saveCampaign = () => {
-        setCampaigns((prev) => [
-            ...prev,
-            {
-                ...newCampaign,
-                id: Date.now(),
-                foundation_id: 1,
-                foundation_name: "Fundación Educativa",
-                image: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&q=80",
+    useEffect(() => {
+        const loadCampaigns = async () => {
+            if (!user?.id) {
+                setLoading(false);
+                return;
+            }
+            try {
+                setLoading(true);
+                const data = await getFoundationCampaigns(user.id);
+                setCampaigns(data || []);
+            } catch (err) {
+                console.error("Error loading campaigns:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadCampaigns();
+    }, [user?.id]);
+
+    const saveCampaign = async () => {
+        if (!user?.id) return;
+        try {
+            setSaving(true);
+            const created = await createCampaign(user.id, {
+                title: newCampaign.title,
+                category: newCampaign.category,
+                goal: Number(newCampaign.goal) || 0,
+                deadline: newCampaign.deadline || null,
+                description: newCampaign.description,
+                status: "active",
                 raised: 0,
-                goal: Number(newCampaign.goal),
-                donors: 0,
-                updates: [],
-                tags: [],
-                items: [],
-            },
-        ]);
-        setShowCreate(false);
-        setNewCampaign({
-            title: "",
-            category: "",
-            goal: "",
-            deadline: "",
-            description: "",
-        });
+                donor_count: 0,
+            });
+            setCampaigns((prev) => [created, ...prev]);
+            setShowCreate(false);
+            setNewCampaign({
+                title: "",
+                category: "",
+                goal: "",
+                deadline: "",
+                description: "",
+            });
+        } catch (err) {
+            console.error("Error creating campaign:", err);
+            alert("No se pudo crear la campaña");
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const saveEdit = () => {
-        setCampaigns((prev) =>
-            prev.map((c) =>
-                c.id === editCampaign.id
-                    ? { ...c, ...editCampaign, goal: Number(editCampaign.goal) }
-                    : c,
-            ),
-        );
-        setEditCampaign(null);
+    const saveEdit = async () => {
+        if (!editCampaign?.id) return;
+        try {
+            setSaving(true);
+            const updated = await updateCampaign(editCampaign.id, {
+                title: editCampaign.title,
+                category: editCampaign.category,
+                goal: Number(editCampaign.goal) || 0,
+                description: editCampaign.description,
+            });
+            setCampaigns((prev) =>
+                prev.map((c) =>
+                    c.id === updated.id ? { ...c, ...updated } : c,
+                ),
+            );
+            setEditCampaign(null);
+        } catch (err) {
+            console.error("Error updating campaign:", err);
+            alert("No se pudo actualizar la campaña");
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const confirmDelete = () => {
-        setCampaigns((prev) => prev.filter((c) => c.id !== deleteCampaign.id));
-        setDeleteCampaign(null);
+    const confirmDelete = async () => {
+        if (!campaignToDelete?.id) return;
+        try {
+            setSaving(true);
+            await deleteCampaignById(campaignToDelete.id);
+            setCampaigns((prev) =>
+                prev.filter((c) => c.id !== campaignToDelete.id),
+            );
+            setCampaignToDelete(null);
+        } catch (err) {
+            console.error("Error deleting campaign:", err);
+            alert("No se pudo eliminar la campaña");
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -750,62 +838,83 @@ export function ManageCampaignsPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {campaigns.map((c) => {
-                    const pct = Math.round((c.raised / c.goal) * 100);
-                    return (
-                        <div
-                            key={c.id}
-                            className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm"
-                        >
-                            <img
-                                src={c.image}
-                                alt={c.title}
-                                className="w-full h-40 object-cover"
-                            />
-                            <div className="p-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Badge label={c.category} />
-                                    {c.tags[0] && <Badge label={c.tags[0]} />}
-                                </div>
-                                <h3 className="font-semibold text-gray-900 mb-3 leading-snug">
-                                    {c.title}
-                                </h3>
-                                <ProgressBar percent={pct} className="mb-2" />
-                                <div className="flex justify-between text-sm mb-1">
-                                    <span className="font-semibold text-blue-600">
-                                        ${c.raised.toLocaleString("es")}
-                                    </span>
-                                    <span className="text-gray-400">
-                                        {pct}% de ${c.goal.toLocaleString("es")}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between text-xs text-gray-400 mb-4">
-                                    <span>{c.donors} donantes</span>
-                                    <span>Límite: {c.deadline}</span>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() =>
-                                            setEditCampaign({
-                                                ...c,
-                                                goal: String(c.goal),
-                                            })
-                                        }
-                                        className="flex-1 border border-gray-200 text-sm font-medium py-2 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-1"
-                                    >
-                                        <EditIcon /> Editar
-                                    </button>
-                                    <button
-                                        onClick={() => setDeleteCampaign(c)}
-                                        className="flex-1 border border-red-100 text-red-500 text-sm font-medium py-2 rounded-xl hover:bg-red-50 flex items-center justify-center gap-1"
-                                    >
-                                        <TrashIcon /> Eliminar
-                                    </button>
+                {loading ? (
+                    <p className="text-gray-500">Cargando campañas...</p>
+                ) : (
+                    campaigns.map((c) => {
+                        const goal = c.goal || 0;
+                        const raised = c.raised || 0;
+                        const pct =
+                            goal > 0 ? Math.round((raised / goal) * 100) : 0;
+                        return (
+                            <div
+                                key={c.id}
+                                className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm"
+                            >
+                                <img
+                                    src={
+                                        c.cover_image ||
+                                        "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&q=80"
+                                    }
+                                    alt={c.title}
+                                    className="w-full h-40 object-cover"
+                                />
+                                <div className="p-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Badge
+                                            label={c.category || "General"}
+                                        />
+                                    </div>
+                                    <h3 className="font-semibold text-gray-900 mb-3 leading-snug">
+                                        {c.title}
+                                    </h3>
+                                    <ProgressBar
+                                        percent={pct}
+                                        className="mb-2"
+                                    />
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span className="font-semibold text-blue-600">
+                                            ${raised.toLocaleString("es")}
+                                        </span>
+                                        <span className="text-gray-400">
+                                            {pct}% de $
+                                            {goal.toLocaleString("es")}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-400 mb-4">
+                                        <span>
+                                            {c.donor_count || 0} donantes
+                                        </span>
+                                        <span>
+                                            Límite: {c.deadline || "Sin fecha"}
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() =>
+                                                setEditCampaign({
+                                                    ...c,
+                                                    goal: String(c.goal || 0),
+                                                })
+                                            }
+                                            className="flex-1 border border-gray-200 text-sm font-medium py-2 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-1"
+                                        >
+                                            <EditIcon /> Editar
+                                        </button>
+                                        <button
+                                            onClick={() =>
+                                                setCampaignToDelete(c)
+                                            }
+                                            className="flex-1 border border-red-100 text-red-500 text-sm font-medium py-2 rounded-xl hover:bg-red-50 flex items-center justify-center gap-1"
+                                        >
+                                            <TrashIcon /> Eliminar
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })
+                )}
 
                 {/* Add new card */}
                 <button
@@ -820,16 +929,16 @@ export function ManageCampaignsPage() {
             </div>
 
             {/* Delete confirm modal */}
-            {deleteCampaign && (
+            {campaignToDelete && (
                 <Modal
                     title="Eliminar campaña"
-                    onClose={() => setDeleteCampaign(null)}
+                    onClose={() => setCampaignToDelete(null)}
                 >
                     <p className="text-sm text-gray-600 mb-2">
                         ¿Estás seguro de que deseas eliminar esta campaña?
                     </p>
                     <p className="text-sm font-semibold text-gray-900 mb-6">
-                        "{deleteCampaign.title}"
+                        "{campaignToDelete.title}"
                     </p>
                     <p className="text-xs text-gray-400 mb-6">
                         Esta acción no se puede deshacer. Los datos de
@@ -837,13 +946,14 @@ export function ManageCampaignsPage() {
                     </p>
                     <div className="flex justify-end gap-3">
                         <button
-                            onClick={() => setDeleteCampaign(null)}
+                            onClick={() => setCampaignToDelete(null)}
                             className="border border-gray-300 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50"
                         >
                             Cancelar
                         </button>
                         <button
                             onClick={confirmDelete}
+                            disabled={saving}
                             className="bg-red-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-700"
                         >
                             Eliminar campaña
@@ -927,6 +1037,7 @@ export function ManageCampaignsPage() {
                             </button>
                             <button
                                 onClick={saveEdit}
+                                disabled={saving}
                                 className="bg-gray-900 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-700"
                             >
                                 Guardar cambios
@@ -1031,6 +1142,7 @@ export function ManageCampaignsPage() {
                             </button>
                             <button
                                 onClick={saveCampaign}
+                                disabled={saving}
                                 className="bg-gray-900 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-700"
                             >
                                 Crear campaña
