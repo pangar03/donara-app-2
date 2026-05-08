@@ -1,10 +1,29 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Credenciales de Supabase
-const SUPABASE_URL = 'https://phflgbcqddfqrkodeyit.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_0IVFq4OoaxKOYm9L08b29Q_mg2yDOF_';
+const DEFAULT_SUPABASE_URL = 'https://phflgbcqddfqrkodeyit.supabase.co';
 
-// Crear cliente de Supabase
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+if (!SUPABASE_ANON_KEY) {
+	throw new Error(
+		'Falta VITE_SUPABASE_ANON_KEY. Crea un archivo .env.local en la raíz (junto a package.json) con VITE_SUPABASE_ANON_KEY=<anon public key (JWT)> y reinicia npm run dev.',
+	);
+}
+
+if (SUPABASE_ANON_KEY.startsWith('sb_publishable_')) {
+	const keyPreview = `${SUPABASE_ANON_KEY.slice(0, 16)}… (len ${SUPABASE_ANON_KEY.length})`;
+	throw new Error(
+		`VITE_SUPABASE_ANON_KEY parece ser una publishable key (${keyPreview}). Usa la "anon public key" (JWT) del proyecto (normalmente empieza con "eyJ").`,
+	);
+}
+
+if (SUPABASE_ANON_KEY.startsWith('sb_secret_')) {
+	throw new Error(
+		'VITE_SUPABASE_ANON_KEY parece ser una service role key (sb_secret_). No la uses en el frontend. Usa la "anon public key" (JWT) del proyecto (normalmente empieza con "eyJ") y rota esa key en Supabase.',
+	);
+}
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ===== FUNCIONES DE AUTENTICACIÓN =====

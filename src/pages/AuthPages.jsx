@@ -47,9 +47,7 @@ function AuthLayout({ children }) {
 					</div>
 				</div>
 				{/* Form area */}
-				<div className='flex-1 flex flex-col justify-center px-6 sm:px-12 py-10'>
-					{children}
-				</div>
+				<div className='flex-1 flex flex-col justify-center px-6 sm:px-12 py-10'>{children}</div>
 			</div>
 		</div>
 	);
@@ -199,10 +197,22 @@ export function LoginPage({ onRegister, onLoggedIn }) {
 							>
 								{provider === 'Google' ? (
 									<svg className='w-4 h-4' viewBox='0 0 24 24'>
-										<path d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z' fill='#4285F4' />
-										<path d='M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z' fill='#34A853' />
-										<path d='M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z' fill='#FBBC05' />
-										<path d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z' fill='#EA4335' />
+										<path
+											d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'
+											fill='#4285F4'
+										/>
+										<path
+											d='M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'
+											fill='#34A853'
+										/>
+										<path
+											d='M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z'
+											fill='#FBBC05'
+										/>
+										<path
+											d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
+											fill='#EA4335'
+										/>
 									</svg>
 								) : (
 									<svg className='w-4 h-4' viewBox='0 0 24 24' fill='#1877F2'>
@@ -235,7 +245,11 @@ export function RegisterTypePage({ onSelect, onBack }) {
 				<div className='space-y-4'>
 					{[
 						{ key: 'donor', title: 'Soy Donante', desc: 'Regístrate para hacer donaciones y apoyar causas' },
-						{ key: 'foundation', title: 'Soy Fundación', desc: 'Regístrate para recibir donaciones y gestionar campañas' },
+						{
+							key: 'foundation',
+							title: 'Soy Fundación',
+							desc: 'Regístrate para recibir donaciones y gestionar campañas',
+						},
 					].map((opt) => (
 						<button
 							key={opt.key}
@@ -287,11 +301,26 @@ export function DonorRegisterPage({ onBack, onComplete }) {
 
 	const handleRegister = async () => {
 		try {
-			if (!form.name.trim()) { setError('Por favor ingresa tu nombre'); return; }
-			if (!form.email.trim()) { setError('Por favor ingresa tu correo'); return; }
-			if (!form.password) { setError('Por favor ingresa una contraseña'); return; }
-			if (form.password !== form.confirm) { setError('Las contraseñas no coinciden'); return; }
-			if (form.password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres'); return; }
+			if (!form.name.trim()) {
+				setError('Por favor ingresa tu nombre');
+				return;
+			}
+			if (!form.email.trim()) {
+				setError('Por favor ingresa tu correo');
+				return;
+			}
+			if (!form.password) {
+				setError('Por favor ingresa una contraseña');
+				return;
+			}
+			if (form.password !== form.confirm) {
+				setError('Las contraseñas no coinciden');
+				return;
+			}
+			if (form.password.length < 6) {
+				setError('La contraseña debe tener al menos 6 caracteres');
+				return;
+			}
 
 			setLoading(true);
 			setError('');
@@ -338,21 +367,51 @@ export function DonorRegisterPage({ onBack, onComplete }) {
 						<div>
 							<h2 className='text-lg font-semibold text-gray-900 mb-5'>Datos Personales</h2>
 							<div className='space-y-4'>
-								<Input label='Nombre Completo' required placeholder='Ingresa tu nombre completo' value={form.name} onChange={set('name')} />
+								<Input
+									label='Nombre Completo'
+									required
+									placeholder='Ingresa tu nombre completo'
+									value={form.name}
+									onChange={set('name')}
+								/>
 								<div className='grid grid-cols-2 gap-3'>
-									<Input label='Correo Electrónico' required type='email' placeholder='ejemplo@correo.com' value={form.email} onChange={set('email')} />
+									<Input
+										label='Correo Electrónico'
+										required
+										type='email'
+										placeholder='ejemplo@correo.com'
+										value={form.email}
+										onChange={set('email')}
+									/>
 									<Input label='Teléfono' placeholder='+57 300 123 4567' value={form.phone} onChange={set('phone')} />
 								</div>
 								<div className='grid grid-cols-2 gap-3'>
-									<Input label='Contraseña' required type='password' placeholder='••••••••' value={form.password} onChange={set('password')} />
-									<Input label='Confirmar Contraseña' required type='password' placeholder='••••••••' value={form.confirm} onChange={set('confirm')} />
+									<Input
+										label='Contraseña'
+										required
+										type='password'
+										placeholder='••••••••'
+										value={form.password}
+										onChange={set('password')}
+									/>
+									<Input
+										label='Confirmar Contraseña'
+										required
+										type='password'
+										placeholder='••••••••'
+										value={form.confirm}
+										onChange={set('confirm')}
+									/>
 								</div>
 								<div className='grid grid-cols-2 gap-3'>
 									<Input label='Ciudad' placeholder='Bogotá' value={form.city} onChange={set('city')} />
 									<Input label='País' placeholder='Colombia' value={form.country} onChange={set('country')} />
 								</div>
 								<div className='flex justify-end pt-2'>
-									<button onClick={() => setStep(1)} className='bg-blue-600 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-blue-700'>
+									<button
+										onClick={() => setStep(1)}
+										className='bg-blue-600 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-blue-700'
+									>
 										Continuar
 									</button>
 								</div>
@@ -362,14 +421,29 @@ export function DonorRegisterPage({ onBack, onComplete }) {
 						<div>
 							<h2 className='text-lg font-semibold text-gray-900 mb-5'>Preferencias de Donación</h2>
 							<div className='space-y-4'>
-								<Select label='Tipo de Donación Preferida' options={['Puntual', 'Recurrente', 'Ambos']} value={form.donationType} onChange={set('donationType')} />
-								<Select label='Rango de Aporte Estimado' options={['$5.000 - $20.000', '$20.000 - $50.000', '$50.000 - $100.000', 'Más de $100.000']} value={form.range} onChange={set('range')} />
+								<Select
+									label='Tipo de Donación Preferida'
+									options={['Puntual', 'Recurrente', 'Ambos']}
+									value={form.donationType}
+									onChange={set('donationType')}
+								/>
+								<Select
+									label='Rango de Aporte Estimado'
+									options={['$5.000 - $20.000', '$20.000 - $50.000', '$50.000 - $100.000', 'Más de $100.000']}
+									value={form.range}
+									onChange={set('range')}
+								/>
 								<div>
 									<p className='text-sm font-medium text-gray-700 mb-2'>Causas de Interés</p>
 									<div className='grid grid-cols-2 gap-2'>
 										{['Salud', 'Educación', 'Alimentación', 'Animales', 'Medio Ambiente', 'Deportes'].map((c) => (
 											<label key={c} className='flex items-center gap-2 text-sm text-gray-700 cursor-pointer'>
-												<input type='checkbox' checked={form.causes.includes(c)} onChange={() => toggleCause(c)} className='rounded text-blue-600' />
+												<input
+													type='checkbox'
+													checked={form.causes.includes(c)}
+													onChange={() => toggleCause(c)}
+													className='rounded text-blue-600'
+												/>
 												{c}
 											</label>
 										))}
@@ -380,15 +454,25 @@ export function DonorRegisterPage({ onBack, onComplete }) {
 									{ key: 'notifications', label: 'Recibir notificaciones sobre campañas' },
 								].map((opt) => (
 									<label key={opt.key} className='flex items-center gap-2 text-sm text-gray-700 cursor-pointer'>
-										<input type='checkbox' checked={form[opt.key]} onChange={(e) => set(opt.key)(e.target.checked)} className='rounded text-blue-600' />
+										<input
+											type='checkbox'
+											checked={form[opt.key]}
+											onChange={(e) => set(opt.key)(e.target.checked)}
+											className='rounded text-blue-600'
+										/>
 										{opt.label}
 									</label>
 								))}
 								{error && (
-									<div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm'>{error}</div>
+									<div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm'>
+										{error}
+									</div>
 								)}
 								<div className='flex justify-between pt-2'>
-									<button onClick={() => setStep(0)} className='border border-gray-300 px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50'>
+									<button
+										onClick={() => setStep(0)}
+										className='border border-gray-300 px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50'
+									>
 										Atrás
 									</button>
 									<button
@@ -427,6 +511,8 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
 		docNum: '',
 		role: '',
 		email: '',
+		password: '',
+		confirm: '',
 		phone: '',
 		description: '',
 		category: '',
@@ -449,13 +535,117 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
 		actaConstitucion: null,
 	});
 
-	const setDoc = (key, file) =>
-		setDocs((d) => ({ ...d, [key]: file ? { name: file.name, file } : null }));
+	const setDoc = (key, file) => setDocs((d) => ({ ...d, [key]: file ? { name: file.name, file } : null }));
 	const removeDoc = (key) => setDocs((d) => ({ ...d, [key]: null }));
+
+	const DOC_FIELDS = [
+		{ key: 'rut', label: 'RUT', required: true, accept: '.pdf,.jpg,.jpeg,.png' },
+		{ key: 'camaraComercio', label: 'Certificado Cámara de Comercio', required: true, accept: '.pdf,.jpg,.jpeg,.png' },
+		{
+			key: 'docIdentidad',
+			label: 'Documento de identidad del representante',
+			required: true,
+			accept: '.pdf,.jpg,.jpeg,.png',
+		},
+		{ key: 'certBancaria', label: 'Certificación bancaria', required: true, accept: '.pdf,.jpg,.jpeg,.png' },
+		{
+			key: 'actaConstitucion',
+			label: 'Acta de constitución (opcional)',
+			required: false,
+			accept: '.pdf,.jpg,.jpeg,.png',
+		},
+	];
 
 	// TODO: Verificar e implementar la lógica de subida de documentos a supabase storage.
 	const handleSubmit = async () => {
 		try {
+			if (!form.legalName.trim()) {
+				setError('Por favor ingresa el nombre legal');
+				return;
+			}
+			if (!form.nit.trim()) {
+				setError('Por favor ingresa el NIT');
+				return;
+			}
+			if (!form.type.trim()) {
+				setError('Por favor selecciona el tipo de organización');
+				return;
+			}
+			if (!form.city.trim()) {
+				setError('Por favor ingresa la ciudad');
+				return;
+			}
+			if (!form.country.trim()) {
+				setError('Por favor ingresa el país');
+				return;
+			}
+			if (!form.rep.trim()) {
+				setError('Por favor ingresa el representante legal');
+				return;
+			}
+			if (!form.docType.trim()) {
+				setError('Por favor selecciona el tipo de documento');
+				return;
+			}
+			if (!form.docNum.trim()) {
+				setError('Por favor ingresa el número de documento');
+				return;
+			}
+			if (!form.role.trim()) {
+				setError('Por favor ingresa el cargo');
+				return;
+			}
+			if (!form.email.trim()) {
+				setError('Por favor ingresa el correo institucional');
+				return;
+			}
+			if (!form.password) {
+				setError('Por favor ingresa una contraseña');
+				return;
+			}
+			if (form.password !== form.confirm) {
+				setError('Las contraseñas no coinciden');
+				return;
+			}
+			if (form.password.length < 6) {
+				setError('La contraseña debe tener al menos 6 caracteres');
+				return;
+			}
+			if (!form.phone.trim()) {
+				setError('Por favor ingresa el teléfono');
+				return;
+			}
+			if (!form.description.trim()) {
+				setError('Por favor ingresa una descripción');
+				return;
+			}
+			if (!form.category.trim()) {
+				setError('Por favor selecciona una categoría');
+				return;
+			}
+			if (!form.bank.trim()) {
+				setError('Por favor ingresa el banco');
+				return;
+			}
+			if (!form.accountType.trim()) {
+				setError('Por favor selecciona el tipo de cuenta');
+				return;
+			}
+			if (!form.accountNum.trim()) {
+				setError('Por favor ingresa el número de cuenta');
+				return;
+			}
+			if (!form.holder.trim()) {
+				setError('Por favor ingresa el titular');
+				return;
+			}
+
+			const missingDocs = DOC_FIELDS.filter((f) => f.required && !docs[f.key]).map((f) => f.label);
+			if (missingDocs.length) {
+				setError(`Faltan documentos requeridos: ${missingDocs.join(', ')}`);
+				return;
+			}
+
 			setError('');
 			setLoading(true);
 
@@ -496,14 +686,6 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
 		}
 	};
 
-	const DOC_FIELDS = [
-		{ key: 'rut', label: 'RUT', required: true, accept: '.pdf,.jpg,.jpeg,.png' },
-		{ key: 'camaraComercio', label: 'Certificado Cámara de Comercio', required: true, accept: '.pdf,.jpg,.jpeg,.png' },
-		{ key: 'docIdentidad', label: 'Documento de identidad del representante', required: true, accept: '.pdf,.jpg,.jpeg,.png' },
-		{ key: 'certBancaria', label: 'Certificación bancaria', required: true, accept: '.pdf,.jpg,.jpeg,.png' },
-		{ key: 'actaConstitucion', label: 'Acta de constitución (opcional)', required: false, accept: '.pdf,.jpg,.jpeg,.png' },
-	];
-
 	const steps = [
 		{
 			title: 'Identificación Básica',
@@ -511,13 +693,25 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
 				<div className='space-y-4'>
 					<div className='grid grid-cols-3 gap-3'>
 						<div className='col-span-2'>
-							<Input label='Nombre Legal' required placeholder='Fundación...' value={form.legalName} onChange={set('legalName')} />
+							<Input
+								label='Nombre Legal'
+								required
+								placeholder='Fundación...'
+								value={form.legalName}
+								onChange={set('legalName')}
+							/>
 						</div>
 						<Input label='Sigla' placeholder='FUND' value={form.initials} onChange={set('initials')} />
 					</div>
 					<div className='grid grid-cols-3 gap-3'>
 						<Input label='NIT' required placeholder='900.123.456-7' value={form.nit} onChange={set('nit')} />
-						<Select label='Tipo' required options={['Fundación', 'ONG', 'Asociación', 'Corporación']} value={form.type} onChange={set('type')} />
+						<Select
+							label='Tipo'
+							required
+							options={['Fundación', 'ONG', 'Asociación', 'Corporación']}
+							value={form.type}
+							onChange={set('type')}
+						/>
 						<Input label='Fecha Constitución' type='date' value={form.date} onChange={set('date')} />
 					</div>
 					<div className='grid grid-cols-2 gap-3'>
@@ -531,15 +725,52 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
 			title: 'Representación Legal',
 			fields: (
 				<div className='space-y-4'>
-					<Input label='Representante Legal' required placeholder='Nombre completo' value={form.rep} onChange={set('rep')} />
+					<Input
+						label='Representante Legal'
+						required
+						placeholder='Nombre completo'
+						value={form.rep}
+						onChange={set('rep')}
+					/>
 					<div className='grid grid-cols-3 gap-3'>
-						<Select label='Tipo Documento' required options={['CC', 'CE', 'Pasaporte']} value={form.docType} onChange={set('docType')} />
+						<Select
+							label='Tipo Documento'
+							required
+							options={['CC', 'CE', 'Pasaporte']}
+							value={form.docType}
+							onChange={set('docType')}
+						/>
 						<Input label='Número' required placeholder='123456789' value={form.docNum} onChange={set('docNum')} />
 						<Input label='Cargo' required placeholder='Director...' value={form.role} onChange={set('role')} />
 					</div>
 					<div className='grid grid-cols-2 gap-3'>
-						<Input label='Email Institucional' required type='email' placeholder='contacto@fundacion.org' value={form.email} onChange={set('email')} />
+						<Input
+							label='Email Institucional'
+							required
+							type='email'
+							placeholder='contacto@fundacion.org'
+							value={form.email}
+							onChange={set('email')}
+						/>
 						<Input label='Teléfono' required placeholder='+57 1 234 5678' value={form.phone} onChange={set('phone')} />
+					</div>
+					<div className='grid grid-cols-2 gap-3'>
+						<Input
+							label='Contraseña'
+							required
+							type='password'
+							placeholder='••••••••'
+							value={form.password}
+							onChange={set('password')}
+						/>
+						<Input
+							label='Confirmar Contraseña'
+							required
+							type='password'
+							placeholder='••••••••'
+							value={form.confirm}
+							onChange={set('confirm')}
+						/>
 					</div>
 				</div>
 			),
@@ -558,8 +789,19 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
 						/>
 					</div>
 					<div className='grid grid-cols-2 gap-3'>
-						<Select label='Categoría' required options={['Educación', 'Salud', 'Animales', 'Medio Ambiente', 'Alimentación', 'Deportes']} value={form.category} onChange={set('category')} />
-						<Input label='Cobertura' placeholder='Local, Regional...' value={form.coverage} onChange={set('coverage')} />
+						<Select
+							label='Categoría'
+							required
+							options={['Educación', 'Salud', 'Animales', 'Medio Ambiente', 'Alimentación', 'Deportes']}
+							value={form.category}
+							onChange={set('category')}
+						/>
+						<Input
+							label='Cobertura'
+							placeholder='Local, Regional...'
+							value={form.coverage}
+							onChange={set('coverage')}
+						/>
 					</div>
 					<div className='flex flex-col gap-1'>
 						<label className='text-sm font-medium text-gray-700'>Beneficiarios</label>
@@ -583,17 +825,31 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
 				<div className='space-y-4'>
 					<div className='grid grid-cols-2 gap-3'>
 						<Input label='Banco' required placeholder='Banco...' value={form.bank} onChange={set('bank')} />
-						<Select label='Tipo Cuenta' required options={['Ahorros', 'Corriente']} value={form.accountType} onChange={set('accountType')} />
+						<Select
+							label='Tipo Cuenta'
+							required
+							options={['Ahorros', 'Corriente']}
+							value={form.accountType}
+							onChange={set('accountType')}
+						/>
 					</div>
 					<div className='grid grid-cols-2 gap-3'>
-						<Input label='Número de Cuenta' required placeholder='1234567890' value={form.accountNum} onChange={set('accountNum')} />
+						<Input
+							label='Número de Cuenta'
+							required
+							placeholder='1234567890'
+							value={form.accountNum}
+							onChange={set('accountNum')}
+						/>
 						<Input label='Titular' required placeholder='Nombre titular' value={form.holder} onChange={set('holder')} />
 					</div>
 
 					{/* Document uploads */}
 					<div className='pt-2'>
 						<p className='text-sm font-semibold text-gray-800 mb-1'>Documentos Requeridos</p>
-						<p className='text-xs text-gray-400 mb-4'>Sube cada documento en formato PDF, JPG o PNG. Máximo 10 MB por archivo.</p>
+						<p className='text-xs text-gray-400 mb-4'>
+							Sube cada documento en formato PDF, JPG o PNG. Máximo 10 MB por archivo.
+						</p>
 						<div className='space-y-3'>
 							{DOC_FIELDS.map(({ key, label, required, accept }) => {
 								const uploaded = docs[key];
@@ -610,8 +866,17 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
 													</div>
 												) : (
 													<div className='w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0'>
-														<svg className='w-4 h-4 text-gray-500' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-															<path strokeLinecap='round' d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' />
+														<svg
+															className='w-4 h-4 text-gray-500'
+															fill='none'
+															viewBox='0 0 24 24'
+															stroke='currentColor'
+															strokeWidth={2}
+														>
+															<path
+																strokeLinecap='round'
+																d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
+															/>
 														</svg>
 													</div>
 												)}
@@ -629,15 +894,35 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
 											</div>
 											<div className='flex items-center gap-2 flex-shrink-0'>
 												{uploaded && (
-													<button type='button' onClick={() => removeDoc(key)} className='text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors'>
+													<button
+														type='button'
+														onClick={() => removeDoc(key)}
+														className='text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors'
+													>
 														Eliminar
 													</button>
 												)}
 												<label className='cursor-pointer'>
-													<input type='file' accept={accept} className='sr-only' onChange={(e) => setDoc(key, e.target.files?.[0] || null)} />
-													<span className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${uploaded ? 'bg-white border border-green-300 text-green-700 hover:bg-green-50' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-														<svg className='w-3 h-3' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2.5}>
-															<path strokeLinecap='round' d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' />
+													<input
+														type='file'
+														accept={accept}
+														className='sr-only'
+														onChange={(e) => setDoc(key, e.target.files?.[0] || null)}
+													/>
+													<span
+														className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${uploaded ? 'bg-white border border-green-300 text-green-700 hover:bg-green-50' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+													>
+														<svg
+															className='w-3 h-3'
+															fill='none'
+															viewBox='0 0 24 24'
+															stroke='currentColor'
+															strokeWidth={2.5}
+														>
+															<path
+																strokeLinecap='round'
+																d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12'
+															/>
 														</svg>
 														{uploaded ? 'Cambiar' : 'Subir'}
 													</span>
@@ -679,21 +964,29 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
 				</div>
 				<div className='bg-white border border-gray-100 rounded-2xl p-6 shadow-sm'>
 					{error && (
-						<div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4'>{error}</div>
+						<div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4'>
+							{error}
+						</div>
 					)}
 					<StepDots total={4} current={step} />
 					<h2 className='text-lg font-semibold text-gray-900 mb-5'>{steps[step].title}</h2>
 					{steps[step].fields}
 					<div className='flex justify-between pt-6'>
 						{step > 0 ? (
-							<button onClick={() => setStep((s) => s - 1)} className='border border-gray-300 px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50'>
+							<button
+								onClick={() => setStep((s) => s - 1)}
+								className='border border-gray-300 px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50'
+							>
 								Atrás
 							</button>
 						) : (
 							<div />
 						)}
 						{step < steps.length - 1 ? (
-							<button onClick={() => setStep((s) => s + 1)} className='bg-blue-600 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-blue-700'>
+							<button
+								onClick={() => setStep((s) => s + 1)}
+								className='bg-blue-600 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-blue-700'
+							>
 								Continuar
 							</button>
 						) : (

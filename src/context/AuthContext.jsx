@@ -59,20 +59,49 @@ export function AuthProvider({ children }) {
 	const signup = async (email, password, userData, type) => {
 		try {
 			setError(null);
-			const {
-				data: { user: newUser },
-				error: signUpError,
-			} = await supabase.auth.signUp({
+			const { data, error: signUpError } = await supabase.auth.signUp({
 				email,
 				password,
 			});
 
 			if (signUpError) throw signUpError;
 
+			const newUser = data?.user;
+			if (!newUser?.id) {
+				throw new Error('No se pudo crear el usuario. Por favor intenta de nuevo.');
+			}
+
 			if (type === 'donor') {
-				await supabase.from('donors').insert([{ user_id: newUser.id, email, ...userData }]);
+				const { error: insertError } = await supabase
+					.from('donors')
+					.insert([{ user_id: newUser.id, email, ...userData }]);
+				if (insertError) throw insertError;
 			} else if (type === 'foundation') {
-				await supabase.from('foundations').insert([{ user_id: newUser.id, email, ...userData }]);
+				const payload = { user_id: newUser.id, email, ...userData };
+				const { error: insertError } = await supabase.from('foundations').insert([payload]);
+				if (insertError) {
+					const isUnknownColumn =
+						insertError.code === '42703' ||
+						/column .* does not exist/i.test(insertError.message || '') ||
+						/could not find/i.test(insertError.message || '');
+
+					if (!isUnknownColumn) throw insertError;
+
+					const fallbackPayload = {
+						user_id: newUser.id,
+						email,
+						name: userData?.legal_name ?? userData?.name ?? '',
+						initials: userData?.initials ?? null,
+						description: userData?.description ?? null,
+						category: userData?.category ?? null,
+						coverage: userData?.coverage ?? null,
+						contact: userData?.phone ?? email,
+						website: userData?.website ?? null,
+					};
+
+					const { error: fallbackError } = await supabase.from('foundations').insert([fallbackPayload]);
+					if (fallbackError) throw fallbackError;
+				}
 			}
 
 			setUser(newUser);
