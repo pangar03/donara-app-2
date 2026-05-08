@@ -2,8 +2,6 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { DonараLogo, ArrowLeft, CheckCircleIcon } from "../components/ui";
 
-// Sección 1: Páginas de autenticación
-// Aqui está el componente del layout dividido (parte azul y el formulario).
 // ─── Shared split layout ───────────────────────────────────────────────────────
 function AuthLayout({ children }) {
     return (
@@ -62,7 +60,6 @@ function AuthLayout({ children }) {
                 </div>
                 {/* Form area */}
                 <div className="flex-1 flex flex-col justify-center px-6 sm:px-12 py-10">
-                    {/* Aquí se renderizan los forms (El children es todo lo que va dentro de esa sección) */}
                     {children}
                 </div>
             </div>
@@ -70,7 +67,6 @@ function AuthLayout({ children }) {
     );
 }
 
-// Sección 2: Indicadores de paso dentro del registro de donantes y fundaciones.
 // ─── Step indicator ────────────────────────────────────────────────────────────
 function StepDots({ total, current }) {
     return (
@@ -96,7 +92,6 @@ function StepDots({ total, current }) {
     );
 }
 
-// Sección 3: Componente personalizado de input y select para los formularios de auth. ===========
 // ─── Input ─────────────────────────────────────────────────────────────────────
 function Input({
     label,
@@ -149,30 +144,37 @@ function Select({ label, required, options, value, onChange }) {
         </div>
     );
 }
-// ========================================================================================================
 
-// Sección 4: Páginas específicas de autenticación (login, registro tipo, registro donante, registro fundación). =====
 // ─── LOGIN ─────────────────────────────────────────────────────────────────────
 export function LoginPage({ onRegister, onLoggedIn }) {
     const { login } = useAuth();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [remember, setRemember] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
-    const handleSubmit = () => {
-        // Mock: email containing "fund" → foundation user
-        // TODO: Reemplazar esta lógica por una llamada real a supabase para autenticar y obtener el tipo de usuario.
-        const isFoundation = email.includes("fund");
-        const userData = {
-            id: 1,
-            name: isFoundation ? "Fundación Educativa" : "María González",
-            email,
-            location: isFoundation
-                ? "Buenos Aires, Argentina"
-                : "Buenos Aires, Argentina",
-        };
-        login(userData, isFoundation ? "foundation" : "donor");
-        onLoggedIn();
+    const handleSubmit = async () => {
+        console.log("[LoginPage] handleSubmit invoked");
+        try {
+            setError("");
+            setLoading(true);
+
+            if (!email || !password) {
+                setError("Por favor completa todos los campos");
+                return;
+            }
+
+            await login(email, password);
+            console.log(
+                "[LoginPage] handleSubmit: login completed, calling onLoggedIn",
+            );
+            onLoggedIn();
+        } catch (err) {
+            setError(err.message || "Error al iniciar sesión");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -185,6 +187,11 @@ export function LoginPage({ onRegister, onLoggedIn }) {
                     Inicia sesión en tu cuenta
                 </p>
                 <div className="space-y-4">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                            {error}
+                        </div>
+                    )}
                     <Input
                         label="Correo Electrónico"
                         type="email"
@@ -215,9 +222,10 @@ export function LoginPage({ onRegister, onLoggedIn }) {
                     </div>
                     <button
                         onClick={handleSubmit}
-                        className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition-colors"
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
-                        Iniciar Sesión
+                        {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
                     </button>
                     <div className="flex items-center gap-3">
                         <div className="flex-1 h-px bg-gray-200" />
@@ -275,9 +283,6 @@ export function LoginPage({ onRegister, onLoggedIn }) {
                         >
                             Regístrate aquí
                         </button>
-                    </p>
-                    <p className="text-center text-xs text-gray-400 mt-2">
-                        Demo: usa "fund@..." para acceder como fundación
                     </p>
                 </div>
             </div>
@@ -339,8 +344,10 @@ export function RegisterTypePage({ onSelect, onBack }) {
 
 // ─── DONOR REGISTER ────────────────────────────────────────────────────────────
 export function DonorRegisterPage({ onBack, onComplete }) {
-    const { login } = useAuth();
+    const { signup } = useAuth();
     const [step, setStep] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
     const [form, setForm] = useState({
         name: "",
         email: "",
@@ -364,17 +371,57 @@ export function DonorRegisterPage({ onBack, onComplete }) {
                 : [...f.causes, c],
         }));
 
-    const handleRegister = () => {
-        login(
-            {
-                id: Date.now(),
-                name: form.name || "Nuevo Donante",
-                email: form.email,
-                location: `${form.city}, ${form.country}`,
-            },
-            "donor",
-        );
-        onComplete();
+    const handleRegister = async () => {
+        try {
+            if (!form.name.trim()) {
+                setError("Por favor ingresa tu nombre");
+                return;
+            }
+            if (!form.email.trim()) {
+                setError("Por favor ingresa tu correo");
+                return;
+            }
+            if (!form.password) {
+                setError("Por favor ingresa una contraseña");
+                return;
+            }
+            if (form.password !== form.confirm) {
+                setError("Las contraseñas no coinciden");
+                return;
+            }
+            if (form.password.length < 6) {
+                setError("La contraseña debe tener al menos 6 caracteres");
+                return;
+            }
+
+            setLoading(true);
+            setError("");
+
+            await signup(
+                form.email,
+                form.password,
+                {
+                    fullName: form.name,
+                    phone: form.phone || null,
+                    city: form.city || null,
+                    country: form.country || null,
+                    donation_type: form.donationType || null,
+                    donation_range: form.range || null,
+                    causes: form.causes,
+                    anonymous: form.anon,
+                    notifications: form.notifications,
+                },
+                "donor",
+            );
+            onComplete();
+        } catch (err) {
+            setError(
+                err.message ||
+                    "Error al registrarse. Por favor intenta de nuevo.",
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -539,11 +586,16 @@ export function DonorRegisterPage({ onBack, onComplete }) {
                                             onChange={(e) =>
                                                 set(opt.key)(e.target.checked)
                                             }
-                                            className={`rounded ${opt.key === "notifications" ? "text-gray-900" : "text-blue-600"}`}
+                                            className="rounded text-blue-600"
                                         />
                                         {opt.label}
                                     </label>
                                 ))}
+                                {error && (
+                                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                                        {error}
+                                    </div>
+                                )}
                                 <div className="flex justify-between pt-2">
                                     <button
                                         onClick={() => setStep(0)}
@@ -553,9 +605,12 @@ export function DonorRegisterPage({ onBack, onComplete }) {
                                     </button>
                                     <button
                                         onClick={handleRegister}
-                                        className="bg-blue-600 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-blue-700"
+                                        disabled={loading}
+                                        className="bg-blue-600 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                                     >
-                                        Registrarse
+                                        {loading
+                                            ? "Registrando..."
+                                            : "Registrarse"}
                                     </button>
                                 </div>
                             </div>
@@ -569,8 +624,10 @@ export function DonorRegisterPage({ onBack, onComplete }) {
 
 // ─── FOUNDATION REGISTER ───────────────────────────────────────────────────────
 export function FoundationRegisterPage({ onBack, onComplete }) {
-    const { login } = useAuth();
+    const { signup } = useAuth();
     const [step, setStep] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
     const [form, setForm] = useState({
         legalName: "",
         initials: "",
@@ -595,10 +652,10 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
         accountType: "",
         accountNum: "",
         holder: "",
+        password: "",
     });
     const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
 
-    // Document uploads: { fileName, file } per slot
     const [docs, setDocs] = useState({
         rut: null,
         camaraComercio: null,
@@ -614,20 +671,54 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
         }));
     const removeDoc = (key) => setDocs((d) => ({ ...d, [key]: null }));
 
-    const handleSubmit = () => {
-        login(
-            {
-                id: Date.now(),
-                name: form.legalName || "Nueva Fundación",
-                email: form.email,
-                location: `${form.city}, ${form.country}`,
-            },
-            "foundation",
-        );
-        onComplete();
+    // TODO: Verificar e implementar la lógica de subida de documentos a supabase storage.
+    const handleSubmit = async () => {
+        try {
+            setError("");
+            setLoading(true);
+
+            await signup(
+                form.email,
+                form.password,
+                {
+                    legal_name: form.legalName,
+                    initials: form.initials || null,
+                    nit: form.nit,
+                    type: form.type,
+                    founded_date: form.date || null,
+                    foundation_type: form.type,
+                    city: form.city,
+                    country: form.country,
+                    rep_name: form.rep,
+                    rep_doc_type: form.docType,
+                    rep_doc_number: form.docNum,
+                    rep_role: form.role,
+                    institutional_email: form.email,
+                    phone: form.phone,
+                    description: form.description,
+                    category: form.category,
+                    coverage: form.coverage || null,
+                    beneficiaries_desc: form.beneficiaries || null,
+                    website: form.website || null,
+                    social_handle: form.social || null,
+                    bank_name: form.bank,
+                    account_type: form.accountType,
+                    account_number: form.accountNum,
+                    account_holder: form.holder,
+                },
+                "foundation",
+            );
+            onComplete();
+        } catch (err) {
+            setError(
+                err.message ||
+                    "Error al registrarse. Por favor intenta de nuevo.",
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
-    // TODO: Verificar e implementar la lógica de subida de documentos a supabase storage o el bucket donde irán.
     const DOC_FIELDS = [
         {
             key: "rut",
@@ -779,6 +870,24 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
                             value={form.phone}
                             onChange={set("phone")}
                         />
+                        <div className="grid grid-cols-2 gap-3">
+                            <Input
+                                label="Contraseña"
+                                required
+                                type="password"
+                                placeholder="••••••••"
+                                value={form.password}
+                                onChange={set("password")}
+                            />
+                            <Input
+                                label="Confirmar Contraseña"
+                                required
+                                type="password"
+                                placeholder="••••••••"
+                                value={form.confirm}
+                                onChange={set("confirm")}
+                            />
+                        </div>
                     </div>
                 </div>
             ),
@@ -907,7 +1016,6 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
                                         >
                                             <div className="flex items-center justify-between gap-3">
                                                 <div className="flex items-center gap-2 min-w-0">
-                                                    {/* Icon */}
                                                     {uploaded ? (
                                                         <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
                                                             <CheckCircleIcon className="w-4 h-4 text-green-600" />
@@ -949,9 +1057,8 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
                                                         )}
                                                     </div>
                                                 </div>
-
                                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                                    {uploaded ? (
+                                                    {uploaded && (
                                                         <button
                                                             type="button"
                                                             onClick={() =>
@@ -961,7 +1068,7 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
                                                         >
                                                             Eliminar
                                                         </button>
-                                                    ) : null}
+                                                    )}
                                                     <label className="cursor-pointer">
                                                         <input
                                                             type="file"
@@ -1005,8 +1112,6 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
                                 },
                             )}
                         </div>
-
-                        {/* Upload progress summary */}
                         <div className="mt-3 flex items-center gap-2">
                             <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                                 <div
@@ -1044,6 +1149,11 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
                     </h1>
                 </div>
                 <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
+                            {error}
+                        </div>
+                    )}
                     <StepDots total={4} current={step} />
                     <h2 className="text-lg font-semibold text-gray-900 mb-5">
                         {steps[step].title}
@@ -1070,9 +1180,10 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
                         ) : (
                             <button
                                 onClick={handleSubmit}
-                                className="bg-blue-600 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-blue-700"
+                                disabled={loading}
+                                className="bg-blue-600 text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
-                                Enviar Registro
+                                {loading ? "Registrando..." : "Enviar Registro"}
                             </button>
                         )}
                     </div>
@@ -1081,5 +1192,3 @@ export function FoundationRegisterPage({ onBack, onComplete }) {
         </AuthLayout>
     );
 }
-
-// ========================================================================================================

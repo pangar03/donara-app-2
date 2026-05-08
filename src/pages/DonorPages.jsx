@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CAMPAIGNS } from "../lib/data";
+import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import {
     ProgressBar,
     Badge,
@@ -10,11 +10,33 @@ import {
     CalendarIcon,
     CheckCircleIcon,
 } from "../components/ui";
+import {
+    getActiveCampaigns,
+    getCampaignById,
+    makeDonation,
+} from "../lib/databaseUtils";
 
 // Sección 1: Páginas relacionadas a los donantes =====================================================================================
 // ─── Donor Home ────────────────────────────────────────────────────────────────
 export function DonorHome({ setPage, setSelectedCampaign }) {
-    const featured = CAMPAIGNS.slice(0, 3);
+    const [campaigns, setCampaigns] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadCampaigns = async () => {
+            try {
+                const data = await getActiveCampaigns();
+                setCampaigns((data || []).slice(0, 3));
+            } catch (err) {
+                console.error("Error loading campaigns:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadCampaigns();
+    }, []);
+
+    const featured = campaigns;
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
             {/* Hero */}
@@ -133,6 +155,8 @@ export function CampaignCard({ campaign, onClick }) {
 export function CampaignsPage({ setPage, setSelectedCampaign }) {
     const [search, setSearch] = useState("");
     const [selectedCat, setSelectedCat] = useState("Todas");
+    const [campaigns, setCampaigns] = useState([]);
+    const [loading, setLoading] = useState(true);
     const cats = [
         "Todas",
         "Educación",
@@ -142,13 +166,28 @@ export function CampaignsPage({ setPage, setSelectedCampaign }) {
         "Alimentación",
     ];
 
-    const filtered = CAMPAIGNS.filter((c) => {
-        const matchCat = selectedCat === "Todas" || c.category === selectedCat;
-        const matchSearch =
-            c.title.toLowerCase().includes(search.toLowerCase()) ||
-            c.foundation_name.toLowerCase().includes(search.toLowerCase());
-        return matchCat && matchSearch;
-    });
+    useEffect(() => {
+        const loadCampaigns = async () => {
+            try {
+                setLoading(true);
+                const category = selectedCat === "Todas" ? null : selectedCat;
+                const data = await getActiveCampaigns(search, category);
+                setCampaigns(data || []);
+            } catch (err) {
+                console.error("Error loading campaigns:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const debounceTimer = setTimeout(() => {
+            loadCampaigns();
+        }, 300);
+
+        return () => clearTimeout(debounceTimer);
+    }, [search, selectedCat]);
+
+    const filtered = campaigns;
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -188,6 +227,16 @@ export function CampaignsPage({ setPage, setSelectedCampaign }) {
                 ))}
             </div>
 
+            {loading && (
+                <div className="text-center py-8">
+                    <p className="text-gray-500">Cargando campañas...</p>
+                </div>
+            )}
+            {!loading && filtered.length === 0 && (
+                <div className="text-center py-8">
+                    <p className="text-gray-500">No se encontraron campañas</p>
+                </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filtered.map((c) => (
                     <CampaignCard
@@ -206,7 +255,29 @@ export function CampaignsPage({ setPage, setSelectedCampaign }) {
 
 // ─── Campaign Detail ───────────────────────────────────────────────────────────
 export function CampaignDetailPage({ campaign, setPage, setSelectedItem }) {
-    const pct = Math.round((campaign.raised / campaign.goal) * 100);
+    const [campaignData, setCampaignData] = useState(campaign);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadCampaign = async () => {
+            try {
+                setLoading(true);
+                const data = await getCampaignById(campaign.id);
+                setCampaignData(data);
+            } catch (err) {
+                console.error("Error loading campaign:", err);
+                setCampaignData(campaign);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadCampaign();
+    }, [campaign.id, campaign]);
+
+    const displayCampaign = campaignData;
+    const pct = Math.round(
+        (displayCampaign.raised / displayCampaign.goal) * 100,
+    );
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
@@ -217,130 +288,160 @@ export function CampaignDetailPage({ campaign, setPage, setSelectedItem }) {
                 <ArrowLeft /> Volver a campañas
             </button>
 
-            <div className="flex flex-col lg:flex-row gap-8">
-                {/* Left */}
-                <div className="flex-1 min-w-0">
-                    <div className="relative">
-                        <img
-                            src={campaign.image}
-                            alt={campaign.title}
-                            className="w-full h-64 sm:h-80 object-cover rounded-2xl"
-                        />
-                        <div className="absolute top-3 left-3 flex gap-2">
-                            {campaign.tags.map((t) => (
-                                <Badge key={t} label={t} />
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="bg-white border border-gray-100 rounded-2xl p-6 mt-4 shadow-sm">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-sm text-blue-600 font-medium">
-                                {campaign.foundation_name}
-                            </span>
-                            <span className="text-gray-300">•</span>
-                            <Badge label={campaign.category} />
-                        </div>
-                        <h1 className="text-2xl font-bold text-gray-900 mb-4">
-                            {campaign.title}
-                        </h1>
-                        <ProgressBar percent={pct} className="mb-3" />
-                        <div className="flex justify-between items-end mb-4">
-                            <div>
-                                <p className="text-2xl font-bold text-blue-600">
-                                    ${campaign.raised.toLocaleString("es")}
-                                </p>
-                                <p className="text-sm text-gray-400">
-                                    Meta: ${campaign.goal.toLocaleString("es")}
-                                </p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {pct}%
-                                </p>
-                                <p className="text-sm text-gray-400">
-                                    Completado
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Donors + Deadline */}
-                        <div className="grid grid-cols-2 gap-3 mb-6">
-                            <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-                                <UsersIcon className="w-5 h-5 text-gray-400" />
-                                <div>
-                                    <p className="text-lg font-bold text-gray-900">
-                                        {campaign.donors}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                        Donantes
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-                                <CalendarIcon className="w-5 h-5 text-gray-400" />
-                                <div>
-                                    <p className="text-sm font-bold text-gray-900">
-                                        {campaign.deadline}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                        Fecha límite
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                            Descripción
-                        </h2>
-                        <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                            {campaign.description}
-                        </p>
-
-                        {campaign.updates.length > 0 && (
-                            <>
-                                <h2 className="text-lg font-semibold text-gray-900 mb-3">
-                                    Actualizaciones
-                                </h2>
-                                <div className="space-y-2">
-                                    {campaign.updates.map((u, i) => (
-                                        <div
-                                            key={i}
-                                            className="border border-gray-100 rounded-xl p-3"
-                                        >
-                                            <p className="text-xs text-gray-400 mb-1">
-                                                {u.date}
-                                            </p>
-                                            <p className="text-sm text-gray-700">
-                                                {u.text}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
+            {loading && (
+                <div className="text-center py-8">
+                    <p className="text-gray-500">Cargando campaña...</p>
                 </div>
-
-                {/* Right – Donation items */}
-                <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                        Formas de donar
-                    </h2>
-                    <div className="space-y-4">
-                        {campaign.items.map((item) => (
-                            <DonationItemCard
-                                key={item.id}
-                                item={item}
-                                onClick={() => {
-                                    setSelectedItem({ item, campaign });
-                                    setPage("confirm-donation");
-                                }}
+            )}
+            {!loading && (
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* Left */}
+                    <div className="flex-1 min-w-0">
+                        <div className="relative">
+                            <img
+                                src={
+                                    displayCampaign.image ||
+                                    displayCampaign.cover_image
+                                }
+                                alt={displayCampaign.title}
+                                className="w-full h-64 sm:h-80 object-cover rounded-2xl"
                             />
-                        ))}
+                            <div className="absolute top-3 left-3 flex gap-2">
+                                {(displayCampaign.tags || []).map((t) => (
+                                    <Badge key={t} label={t} />
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white border border-gray-100 rounded-2xl p-6 mt-4 shadow-sm">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-sm text-blue-600 font-medium">
+                                    {displayCampaign.foundation_name ||
+                                        displayCampaign.foundations?.legal_name}
+                                </span>
+                                <span className="text-gray-300">•</span>
+                                <Badge label={displayCampaign.category} />
+                            </div>
+                            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                                {displayCampaign.title}
+                            </h1>
+                            <ProgressBar percent={pct} className="mb-3" />
+                            <div className="flex justify-between items-end mb-4">
+                                <div>
+                                    <p className="text-2xl font-bold text-blue-600">
+                                        $
+                                        {(
+                                            displayCampaign.raised || 0
+                                        ).toLocaleString("es")}
+                                    </p>
+                                    <p className="text-sm text-gray-400">
+                                        Meta: $
+                                        {(
+                                            displayCampaign.goal || 0
+                                        ).toLocaleString("es")}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-2xl font-bold text-gray-900">
+                                        {pct}%
+                                    </p>
+                                    <p className="text-sm text-gray-400">
+                                        Completado
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Donors + Deadline */}
+                            <div className="grid grid-cols-2 gap-3 mb-6">
+                                <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+                                    <UsersIcon className="w-5 h-5 text-gray-400" />
+                                    <div>
+                                        <p className="text-lg font-bold text-gray-900">
+                                            {displayCampaign.donor_count || 0}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Donantes
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+                                    <CalendarIcon className="w-5 h-5 text-gray-400" />
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-900">
+                                            {displayCampaign.deadline ||
+                                                "Abierta"}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Fecha límite
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                                Descripción
+                            </h2>
+                            <p className="text-sm text-gray-600 leading-relaxed mb-6">
+                                {displayCampaign.description}
+                            </p>
+
+                            {(displayCampaign.campaign_updates || []).length >
+                                0 && (
+                                <>
+                                    <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                                        Actualizaciones
+                                    </h2>
+                                    <div className="space-y-2">
+                                        {displayCampaign.campaign_updates.map(
+                                            (u, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="border border-gray-100 rounded-xl p-3"
+                                                >
+                                                    <p className="text-xs text-gray-400 mb-1">
+                                                        {new Date(
+                                                            u.created_at,
+                                                        ).toLocaleDateString(
+                                                            "es",
+                                                        )}
+                                                    </p>
+                                                    <p className="text-sm text-gray-700">
+                                                        {u.update_text}
+                                                    </p>
+                                                </div>
+                                            ),
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right – Donation items */}
+                    <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
+                        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                            Formas de donar
+                        </h2>
+                        <div className="space-y-4">
+                            {(displayCampaign.donation_items || []).map(
+                                (item) => (
+                                    <DonationItemCard
+                                        key={item.id}
+                                        item={item}
+                                        onClick={() => {
+                                            setSelectedItem({
+                                                item,
+                                                campaign: displayCampaign,
+                                            });
+                                            setPage("confirm-donation");
+                                        }}
+                                    />
+                                ),
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }
@@ -394,7 +495,32 @@ export function ConfirmDonationPage({ data, setPage, onSuccess }) {
     const { item, campaign } = data;
     const [qty, setQty] = useState(1);
     const [anon, setAnon] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const { user } = useAuth();
     const total = item.price * qty;
+
+    const handleConfirmDonation = async () => {
+        try {
+            setLoading(true);
+            const donationData = {
+                donor_id: user?.id,
+                campaign_id: campaign.id,
+                item_id: item.id,
+                foundation_id: campaign.foundation_id,
+                quantity: qty,
+                amount: total,
+                anonymous: anon,
+                status: "pending",
+            };
+            await makeDonation(donationData);
+            onSuccess && onSuccess();
+        } catch (err) {
+            console.error("Error making donation:", err);
+            alert("Error al procesar la donación. Por favor intenta de nuevo.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
@@ -516,10 +642,13 @@ export function ConfirmDonationPage({ data, setPage, onSuccess }) {
             </div>
 
             <button
-                onClick={onSuccess}
-                className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-base hover:bg-blue-700 transition-colors"
+                onClick={handleConfirmDonation}
+                disabled={loading}
+                className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-base hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                Confirmar donación de ${total.toLocaleString("es")}
+                {loading
+                    ? "Procesando..."
+                    : `Confirmar donación de $${total.toLocaleString("es")}`}
             </button>
         </div>
     );

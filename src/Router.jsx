@@ -232,12 +232,20 @@ function FoundationApp() {
 // Seccion 3: Router principal de la aplicación, que decide qué flujo mostrar (auth, donante o fundación) según el estado de autenticación y tipo de usuario obtenido del contexto de autenticación.
 // ─── Root Router ───────────────────────────────────────────────────────────────
 export function AppRouter() {
-    const { user, userType } = useAuth();
+    const { user, userType, isLoading } = useAuth();
+    console.log("[AppRouter] render decision", { user, userType });
+
+    if (isLoading) {
+        console.log("[AppRouter] auth still loading — waiting to render route");
+        return <div className="min-h-screen bg-gray-50" />;
+    }
 
     if (!user) {
+        console.log("[AppRouter] no user — rendering AuthFlow");
         return <AuthFlow onLoggedIn={() => {}} />;
     }
 
+    console.log("[AppRouter] authenticated, userType=", userType);
     if (userType === "foundation") return <FoundationApp />;
     return <DonorApp />;
 }
