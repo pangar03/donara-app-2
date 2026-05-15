@@ -14,26 +14,37 @@ import {
     getActiveCampaigns,
     getCampaignById,
     makeDonation,
+    getPlatformStats,
 } from "../lib/databaseUtils";
 
 // Sección 1: Páginas relacionadas a los donantes =====================================================================================
 // ─── Donor Home ────────────────────────────────────────────────────────────────
 export function DonorHome({ setPage, setSelectedCampaign }) {
     const [campaigns, setCampaigns] = useState([]);
+    const [stats, setStats] = useState({
+        activeCampaigns: 0,
+        verifiedFoundations: 0,
+        totalDonors: 0,
+        totalDonations: 0,
+    });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const loadCampaigns = async () => {
+        const loadData = async () => {
             try {
-                const data = await getActiveCampaigns();
-                setCampaigns((data || []).slice(0, 3));
+                const [campaignsData, statsData] = await Promise.all([
+                    getActiveCampaigns(),
+                    getPlatformStats(),
+                ]);
+                setCampaigns((campaignsData || []).slice(0, 3));
+                setStats(statsData);
             } catch (err) {
-                console.error("Error loading campaigns:", err);
+                console.error("Error loading data:", err);
             } finally {
                 setLoading(false);
             }
         };
-        loadCampaigns();
+        loadData();
     }, []);
 
     const featured = campaigns;
@@ -64,17 +75,17 @@ export function DonorHome({ setPage, setSelectedCampaign }) {
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
                 {[
-                    { label: "Campañas activas", value: "42" },
-                    { label: "Fundaciones verificadas", value: "18" },
-                    { label: "Donantes activos", value: "3.2K" },
-                    { label: "Vidas impactadas", value: "75K+" },
+                    { label: "Campañas activas", value: stats.activeCampaigns },
+                    { label: "Fundaciones", value: stats.verifiedFoundations },
+                    { label: "Donantes activos", value: stats.totalDonors },
+                    { label: "Vidas impactadas", value: stats.totalDonations },
                 ].map((s) => (
                     <div
                         key={s.label}
                         className="bg-white border border-gray-100 rounded-2xl p-5 text-center shadow-sm"
                     >
                         <p className="text-2xl font-bold text-blue-600">
-                            {s.value}
+                            {loading ? "-" : s.value}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">{s.label}</p>
                     </div>

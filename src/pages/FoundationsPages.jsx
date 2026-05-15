@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import {
     Badge,
     ProgressBar,
@@ -10,6 +11,10 @@ import {
     getVerifiedFoundations,
     getFoundationById,
     getActiveCampaigns,
+    getFoundationItems,
+    makeDonation,
+    getFoundationDonations,
+    formatCompactCurrency,
 } from "../lib/databaseUtils";
 
 // Seccion 1: Listado de fundaciones
@@ -23,15 +28,25 @@ export function FoundationsPage({
     setSelectedCampaign,
 }) {
     const [search, setSearch] = useState("");
+    const [selectedCat, setSelectedCat] = useState("Todas");
     const [foundations, setFoundations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const cats = [
+        "Todas",
+        "Educación",
+        "Salud",
+        "Animales",
+        "Medio Ambiente",
+        "Alimentación",
+    ];
 
     useEffect(() => {
         const loadFoundations = async () => {
             try {
                 setLoading(true);
-                const data = await getVerifiedFoundations(search);
+                const category = selectedCat === "Todas" ? null : selectedCat;
+                const data = await getVerifiedFoundations(search, category);
                 setFoundations(data || []);
             } catch (err) {
                 console.error("Error loading foundations:", err);
@@ -46,7 +61,7 @@ export function FoundationsPage({
         }, 300);
 
         return () => clearTimeout(debounceTimer);
-    }, [search]);
+    }, [search, selectedCat]);
 
     const filtered = foundations;
 
@@ -61,7 +76,7 @@ export function FoundationsPage({
 
             <div className="flex gap-3 mb-6">
                 <div className="flex-1 relative">
-                    <FilterIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <SearchIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
@@ -69,9 +84,19 @@ export function FoundationsPage({
                         className="w-full pl-9 pr-4 py-2.5 border border-gray-200 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
-                <button className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    <FilterIcon className="w-4 h-4" /> Filtros
-                </button>
+            </div>
+
+            {/* Category filter chips */}
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
+                {cats.map((c) => (
+                    <button
+                        key={c}
+                        onClick={() => setSelectedCat(c)}
+                        className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${selectedCat === c ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                    >
+                        {c}
+                    </button>
+                ))}
             </div>
 
             {loading && (
@@ -204,24 +229,50 @@ export function FoundationPublicProfile({
     foundation: f,
     setPage,
     setSelectedCampaign,
+    setSelectedItem,
 }) {
     const [foundation, setFoundation] = useState(f);
     const [campaigns, setCampaigns] = useState([]);
+    const [standaloneItems, setStandaloneItems] = useState([]);
+    const [donationStats, setDonationStats] = useState({
+        totalRaised: 0,
+    });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const loadFoundationData = async () => {
             try {
                 setLoading(true);
-                // Load full foundation data and campaigns
-                const [foundationData, campaignsData] = await Promise.all([
-                    getFoundationById(f.id),
+                const [
+                    foundationData,
+                    campaignsData,
+                    itemsData,
+                    donationsData,
+                ] = await Promise.all([
+                    getFoundationById(f.user_id),
                     getActiveCampaigns("", null).then((data) =>
-                        (data || []).filter((c) => c.foundation_id === f.id),
+                        (data || []).filter(
+                            (c) => c.foundation_id === f.user_id,
+                        ),
                     ),
+                    getFoundationItems(f.user_id),
+                    getFoundationDonations(f.user_id),
                 ]);
                 setFoundation(foundationData);
                 setCampaigns(campaignsData);
+                // Filter for standalone items (no campaign_id)
+                setStandaloneItems(
+                    (itemsData || []).filter(
+                        (item) => !item.campaign_id && item.active,
+                    ),
+                );
+
+                // Calculate total raised from donations
+                const totalRaised = (donationsData || []).reduce(
+                    (sum, d) => sum + (d.amount || 0),
+                    0,
+                );
+                setDonationStats({ totalRaised });
             } catch (err) {
                 console.error("Error loading foundation:", err);
             } finally {
@@ -285,7 +336,12 @@ export function FoundationPublicProfile({
                                 </span>
                             </div>
                             <div className="flex gap-3 mt-3">
-                                <button className="bg-blue-600 text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-blue-700">
+                                <button
+                                    onClick={() =>
+                                        setPage("foundation-products")
+                                    }
+                                    className="bg-blue-600 text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-blue-700"
+                                >
                                     Donar
                                 </button>
                                 <button className="border border-gray-300 text-sm font-medium px-5 py-2 rounded-xl hover:bg-gray-50">
@@ -306,11 +362,17 @@ export function FoundationPublicProfile({
                             {[
                                 {
                                     label: "Misión",
-                                    value: displayFoundation.description || "",
+                                    value:
+                                        displayFoundation.mission ||
+                                        displayFoundation.description ||
+                                        "",
                                 },
                                 {
                                     label: "Visión",
-                                    value: displayFoundation.description || "",
+                                    value:
+                                        displayFoundation.vision ||
+                                        displayFoundation.description ||
+                                        "",
                                 },
                             ].map((item) => (
                                 <div key={item.label}>
@@ -410,7 +472,9 @@ export function FoundationPublicProfile({
                                 },
                                 {
                                     label: "Recursos entregados",
-                                    value: displayFoundation.resources || "N/A",
+                                    value: formatCompactCurrency(
+                                        donationStats.totalRaised,
+                                    ),
                                 },
                                 {
                                     label: "Transparencia",
@@ -502,11 +566,12 @@ export function FoundationPublicProfile({
                             </div>
                         </section>
                     )}
-                    {/* Donation items — pulled from this foundation's campaigns */}
+                    {/* All donation items (campaign + standalone) */}
                     {(() => {
-                        const allItems = campaigns
-                            .flatMap((c) => c.items || [])
-                            .slice(0, 3);
+                        const allItems = [
+                            ...standaloneItems,
+                            ...campaigns.flatMap((c) => c.items || []),
+                        ].slice(0, 6);
                         if (allItems.length === 0) return null;
                         return (
                             <section className="mb-8">
@@ -517,7 +582,16 @@ export function FoundationPublicProfile({
                                     {allItems.map((item) => (
                                         <div
                                             key={item.id}
-                                            className="border border-gray-100 rounded-2xl p-4 bg-white shadow-sm"
+                                            className="border border-gray-100 rounded-2xl p-4 bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                                            onClick={() => {
+                                                setSelectedItem({
+                                                    item,
+                                                    campaign: null,
+                                                    foundation:
+                                                        displayFoundation,
+                                                });
+                                                setPage("foundation-products");
+                                            }}
                                         >
                                             <p className="font-semibold text-gray-900 mb-1">
                                                 {item.name}
@@ -531,7 +605,21 @@ export function FoundationPublicProfile({
                                             <p className="text-xs text-gray-500 mb-3">
                                                 {item.impact}
                                             </p>
-                                            <button className="w-full bg-blue-600 text-white text-sm font-semibold py-2 rounded-xl hover:bg-blue-700">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedItem({
+                                                        item,
+                                                        campaign: null,
+                                                        foundation:
+                                                            displayFoundation,
+                                                    });
+                                                    setPage(
+                                                        "foundation-products",
+                                                    );
+                                                }}
+                                                className="w-full bg-blue-600 text-white text-sm font-semibold py-2 rounded-xl hover:bg-blue-700"
+                                            >
                                                 Donar
                                             </button>
                                         </div>
@@ -585,5 +673,240 @@ export function FoundationPublicProfile({
     );
 }
 
+// ─── Foundation Products Page ──────────────────────────────────────────────────
+export function FoundationProductsPage({
+    foundation,
+    selectedItem,
+    setPage,
+    setSelectedItem,
+}) {
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadItems = async () => {
+            try {
+                setLoading(true);
+                const itemsData = await getFoundationItems(foundation.user_id);
+                setItems((itemsData || []).filter((item) => item.active));
+            } catch (err) {
+                console.error("Error loading foundation items:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadItems();
+    }, [foundation.id]);
+
+    return (
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+            <button
+                onClick={() => setPage("foundation-public")}
+                className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 mb-6"
+            >
+                ← Volver al perfil
+            </button>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                Productos de donación
+            </h1>
+            <p className="text-gray-500 text-sm mb-6">
+                Elige cómo deseas ayudar a{" "}
+                {foundation.legal_name || foundation.name}
+            </p>
+
+            {loading && (
+                <div className="text-center py-8">
+                    <p className="text-gray-500">Cargando productos...</p>
+                </div>
+            )}
+            {!loading && items.length === 0 && (
+                <div className="text-center py-8">
+                    <p className="text-gray-500">
+                        No hay productos disponibles
+                    </p>
+                </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {items.map((item) => (
+                    <div
+                        key={item.id}
+                        className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                    >
+                        <div className="h-32 bg-gray-200" />
+                        <div className="p-4">
+                            <div className="flex items-center justify-between mb-1">
+                                <p className="font-semibold text-gray-900">
+                                    {item.name}
+                                </p>
+                                {item.tag && <Badge label={item.tag} />}
+                            </div>
+                            {item.category && <Badge label={item.category} />}
+                            <p className="text-xs text-gray-500 mb-2 mt-2">
+                                {item.description || ""}
+                            </p>
+                            <p className="text-2xl font-bold text-blue-600 mb-1">
+                                ${item.price.toLocaleString("es")}
+                            </p>
+                            <p className="text-xs text-gray-500 mb-3">
+                                {item.impact}
+                            </p>
+                            {item.available <= 5 && item.available > 0 && (
+                                <p className="text-xs text-red-500 mb-3">
+                                    Disponibles: {item.available}
+                                </p>
+                            )}
+                            <button
+                                onClick={() => {
+                                    setSelectedItem({
+                                        item,
+                                        campaign: null,
+                                        foundation,
+                                    });
+                                    setPage("foundation-checkout");
+                                }}
+                                className="w-full bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-blue-700 transition-colors"
+                            >
+                                Donar
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ─── Foundation Checkout ───────────────────────────────────────────────────────
+export function FoundationCheckoutPage({ data, setPage, onSuccess }) {
+    const { item, foundation } = data;
+    const [qty, setQty] = useState(1);
+    const [anon, setAnon] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const { user } = useAuth();
+    const total = item.price * qty;
+
+    const handleConfirmDonation = async () => {
+        try {
+            setLoading(true);
+            const donationData = {
+                donor_id: user?.id,
+                campaign_id: null,
+                item_id: item.id,
+                foundation_id: foundation.user_id,
+                quantity: qty,
+                amount: total,
+                anonymous: anon,
+                status: "pending",
+            };
+            await makeDonation(donationData);
+            setPage("donation-success");
+            onSuccess && onSuccess();
+        } catch (err) {
+            console.error("Error making donation:", err);
+            alert("Error al procesar la donación. Por favor intenta de nuevo.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+            <button
+                onClick={() => setPage("foundation-products")}
+                className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 mb-6"
+            >
+                ← Volver
+            </button>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                Confirmar donación
+            </h1>
+            <p className="text-gray-500 text-sm mb-6">
+                Revisa los detalles antes de continuar
+            </p>
+
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm mb-4">
+                <h2 className="font-semibold text-gray-900 mb-4">
+                    Resumen de donación
+                </h2>
+                <div className="space-y-3 divide-y divide-gray-100">
+                    <div className="pt-3 first:pt-0">
+                        <p className="text-xs text-gray-400 mb-0.5">
+                            Fundación
+                        </p>
+                        <p className="text-sm font-medium text-gray-900">
+                            {foundation.legal_name || foundation.name}
+                        </p>
+                    </div>
+                    <div className="pt-3">
+                        <p className="text-xs text-gray-400 mb-0.5">
+                            Ítem seleccionado
+                        </p>
+                        <p className="text-sm font-medium text-gray-900">
+                            {item.name}
+                        </p>
+                    </div>
+                    <div className="pt-3">
+                        <p className="text-xs text-gray-400 mb-0.5">Impacto</p>
+                        <p className="text-sm font-medium text-blue-600">
+                            {item.impact}
+                        </p>
+                    </div>
+                    <div className="pt-3">
+                        <p className="text-xs text-gray-400 mb-2">Cantidad</p>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() =>
+                                    setQty((q) => Math.max(1, q - 1))
+                                }
+                                className="w-8 h-8 border border-gray-200 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                            >
+                                −
+                            </button>
+                            <span className="text-sm font-semibold w-6 text-center">
+                                {qty}
+                            </span>
+                            <button
+                                onClick={() => setQty((q) => q + 1)}
+                                className="w-8 h-8 border border-gray-200 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div className="mt-4 bg-blue-50 rounded-xl p-4 flex justify-between items-center">
+                    <p className="font-semibold text-gray-800">Total a donar</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                        ${total.toLocaleString("es")}
+                    </p>
+                </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm mb-6">
+                <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={anon}
+                        onChange={(e) => setAnon(e.target.checked)}
+                        className="rounded text-blue-600 w-5 h-5"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                        Donar anónimamente
+                    </span>
+                </label>
+            </div>
+
+            <button
+                onClick={handleConfirmDonation}
+                disabled={loading}
+                className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-base hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                {loading
+                    ? "Procesando..."
+                    : `Confirmar donación de $${total.toLocaleString("es")}`}
+            </button>
+        </div>
+    );
+}
+
 // ========================================================================================================
-// TODO: Revisar que toda la información mostrada en el perfil público de la fundación se corresponda con datos reales del backend una vez esté listo, y conectar los botones de donación para que lleven al flujo de donación real. También revisar que el diseño se vea bien con diferentes longitudes de texto y tamaños de imagen, y ajustar estilos si es necesario.

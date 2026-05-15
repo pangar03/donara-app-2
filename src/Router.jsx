@@ -21,6 +21,8 @@ import { DonorProfilePage, MyDonationsPage } from "./pages/DonorProfile";
 import {
     FoundationsPage,
     FoundationPublicProfile,
+    FoundationProductsPage,
+    FoundationCheckoutPage,
 } from "./pages/FoundationsPages";
 
 // Foundation pages
@@ -29,6 +31,7 @@ import {
     ManageItemsPage,
     ManageCampaignsPage,
     FoundationProfilePage,
+    FoundationDonationsPage,
 } from "./pages/FoundationDashboard";
 
 // Shared nav
@@ -160,6 +163,38 @@ function DonorApp() {
                         foundation={selectedFoundation}
                         setPage={setPage}
                         setSelectedCampaign={setSelectedCampaign}
+                        setSelectedItem={setSelectedItem}
+                    />
+                ) : (
+                    <FoundationsPage
+                        setPage={setPage}
+                        setSelectedFoundation={setSelectedFoundation}
+                        setSelectedCampaign={setSelectedCampaign}
+                    />
+                );
+
+            case "foundation-products":
+                return selectedFoundation ? (
+                    <FoundationProductsPage
+                        foundation={selectedFoundation}
+                        selectedItem={selectedItem}
+                        setPage={setPage}
+                        setSelectedItem={setSelectedItem}
+                    />
+                ) : (
+                    <FoundationsPage
+                        setPage={setPage}
+                        setSelectedFoundation={setSelectedFoundation}
+                        setSelectedCampaign={setSelectedCampaign}
+                    />
+                );
+
+            case "foundation-checkout":
+                return selectedItem ? (
+                    <FoundationCheckoutPage
+                        data={selectedItem}
+                        setPage={setPage}
+                        onSuccess={handleDonationSuccess}
                     />
                 ) : (
                     <FoundationsPage
@@ -216,6 +251,8 @@ function FoundationApp() {
                 return <ManageCampaignsPage />;
             case "foundation-profile":
                 return <FoundationProfilePage />;
+            case "foundation-donations":
+                return <FoundationDonationsPage />;
             default:
                 return <FoundationHome setPage={setPage} />;
         }

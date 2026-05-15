@@ -375,7 +375,7 @@ export const getVerifiedFoundations = async (
 ) => {
     let query = supabase.from("foundations").select(
         `
-      id, legal_name, initials, color, description, category,
+      id, user_id, legal_name, initials, color, description, category,
       coverage, verified, logo_url, total_beneficiaries,
       campaigns_executed, transparency
     `,
@@ -405,7 +405,7 @@ export const getFoundationById = async (foundationId) => {
     const { data, error } = await supabase
         .from("foundations")
         .select("*")
-        .eq("id", foundationId)
+        .eq("user_id", foundationId)
         .single();
     if (error) throw error;
     return data;
@@ -680,6 +680,19 @@ export const getDonorStats = async (donorId) => {
     return { totalDonated, campaignsSupported };
 };
 
+/**
+ * Get all donations to a specific foundation
+ */
+export const getFoundationDonations = async (foundationId) => {
+    const { data, error } = await supabase
+        .from("donations")
+        .select("*")
+        .eq("foundation_id", foundationId)
+        .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data;
+};
+
 // ============================================================
 // FOUNDATION FOLLOWERS
 // ============================================================
@@ -718,16 +731,62 @@ export const getFollowedFoundations = async (donorId) => {
     return data.map((f) => f.foundations);
 };
 
-// ============================================================
-// REPORTS
-// ============================================================
+/**
+ * Get platform statistics
+ */
+export const getPlatformStats = async () => {
+    try {
+        const [campaignsData, foundationsData, donorsData, donationsData] =
+            await Promise.all([
+                supabase.from("campaigns").select("id").eq("status", "active"),
+                supabase.from("foundations").select("id"),
+                supabase.from("donors").select("id"),
+                supabase
+                    .from("donations")
+                    .select("id")
+                    .eq("status", "confirmed"),
+            ]);
+
+        return {
+            activeCampaigns: campaignsData.data?.length || 0,
+            verifiedFoundations: foundationsData.data?.length || 0,
+            totalDonors: donorsData.data?.length || 0,
+            totalDonations: donationsData.data?.length || 0,
+        };
+    } catch (err) {
+        console.error("Error getting platform stats:", err);
+        throw err;
+    }
+};
 
 /**
- * Report a foundation
+ * Get unique donor count for a specific foundation
  */
-export const reportFoundation = async (donorId, foundationId, reason) => {
-    const { error } = await supabase
-        .from("foundation_reports")
-        .insert({ donor_id: donorId, foundation_id: foundationId, reason });
-    if (error) throw error;
+export const getFoundationDonorCount = async (foundationId) => {
+    try {
+        const { data, error } = await supabase
+            .from("donations")
+            .select("donor_id", { distinct: true })
+            .eq("foundation_id", foundationId)
+            .eq("status", "confirmed");
+        if (error) throw error;
+        return data?.length || 0;
+    } catch (err) {
+        console.error("Error getting foundation donor count:", err);
+        throw err;
+    }
+};
+
+/**
+ * Format currency in compact notation (k for thousands, M for millions)
+ */
+export const formatCompactCurrency = (value) => {
+    const num = Number(value) || 0;
+    if (num >= 1000000) {
+        return `$${(num / 1000000).toFixed(1)}M`;
+    }
+    if (num >= 1000) {
+        return `$${(num / 1000).toFixed(1)}k`;
+    }
+    return `$${num.toLocaleString("es")}`;
 };
