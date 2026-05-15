@@ -23,7 +23,11 @@ import {
     deleteDonationItem,
     toggleDonationItem,
     getFoundationProfile,
+    updateFoundationProfile,
     getCampaignDonations,
+    getFoundationDonorCount,
+    getFoundationDonations,
+    formatCompactCurrency,
 } from "../lib/databaseUtils";
 
 // Seccion 1: Dashboard principal de la fundación, con estadísticas, acceso rápido a secciones clave y vista previa de campañas activas. Desde aquí la fundación puede navegar a la gestión de campañas, ítems de donación y perfil. =============================================
@@ -44,11 +48,12 @@ export function FoundationHome({ setPage }) {
             if (!user?.id) return;
             try {
                 setLoading(true);
-                const [campaignsData, itemsData, foundationData] =
+                const [campaignsData, itemsData, donorCount, donationsData] =
                     await Promise.all([
                         getFoundationCampaigns(user.id),
                         getFoundationItems(user.id),
-                        getFoundationProfile(user.id),
+                        getFoundationDonorCount(user.id),
+                        getFoundationDonations(user.id),
                     ]);
 
                 setCampaigns(campaignsData || []);
@@ -57,19 +62,16 @@ export function FoundationHome({ setPage }) {
                 const activeCampaigns = (campaignsData || []).filter(
                     (c) => c.status === "active" || !c.status,
                 ).length;
-                const totalRaised = (campaignsData || []).reduce(
-                    (sum, c) => sum + (c.raised || 0),
+                const totalRaised = (donationsData || []).reduce(
+                    (sum, d) => sum + (d.amount || 0),
                     0,
                 );
-                const totalDonors = new Set(
-                    (campaignsData || []).flatMap((c) => c.donor_count || 0),
-                ).size;
 
                 setStats({
                     totalRecaudado: totalRaised,
                     campaignasActivas: activeCampaigns,
                     itemsCount: (itemsData || []).length,
-                    donantesTotales: totalDonors,
+                    donantesTotales: donorCount,
                 });
             } catch (err) {
                 console.error("Error loading foundation data:", err);
@@ -106,6 +108,7 @@ export function FoundationHome({ setPage }) {
                         label: "Total recaudado",
                         value: `$${stats.totalRecaudado.toLocaleString("es")}`,
                         color: "text-blue-600",
+                        onClick: () => setPage("foundation-donations"),
                     },
                     {
                         label: "Campañas activas",
@@ -121,11 +124,13 @@ export function FoundationHome({ setPage }) {
                         label: "Donantes totales",
                         value: stats.donantesTotales,
                         color: "text-gray-900",
+                        onClick: () => setPage("foundation-donations"),
                     },
                 ].map((s) => (
                     <div
                         key={s.label}
-                        className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm"
+                        onClick={s.onClick}
+                        className={`bg-white border border-gray-100 rounded-2xl p-5 shadow-sm ${s.onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""}`}
                     >
                         <p className="text-xs text-gray-500 mb-1">{s.label}</p>
                         <p className={`text-2xl font-bold ${s.color}`}>
@@ -240,6 +245,7 @@ export function FoundationHome({ setPage }) {
 export function ManageItemsPage() {
     const { user } = useAuth();
     const [items, setItems] = useState([]);
+    const [campaigns, setCampaigns] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [openMenu, setOpenMenu] = useState(null);
@@ -252,8 +258,12 @@ export function ManageItemsPage() {
             if (!user?.id) return;
             try {
                 setLoading(true);
-                const data = await getFoundationItems(user.id);
-                setItems(data || []);
+                const [itemsData, campaignsData] = await Promise.all([
+                    getFoundationItems(user.id),
+                    getFoundationCampaigns(user.id),
+                ]);
+                setItems(itemsData || []);
+                setCampaigns(campaignsData || []);
             } catch (err) {
                 console.error("Error loading items:", err);
             } finally {
@@ -320,18 +330,25 @@ export function ManageItemsPage() {
     const saveItem = async (data) => {
         try {
             setSaving(true);
+            const itemData = {
+                name: data.name,
+                category: data.category,
+                price: data.price,
+                available: data.available,
+                impact: data.impact,
+                tag: data.tag,
+                active: data.active,
+                ...(data.campaignId && { campaign_id: data.campaignId }),
+            };
             if (editItem) {
-                await updateDonationItem(editItem.id, data);
+                await updateDonationItem(editItem.id, itemData);
                 setItems(
                     items.map((i) =>
-                        i.id === editItem.id ? { ...i, ...data } : i,
+                        i.id === editItem.id ? { ...i, ...itemData } : i,
                     ),
                 );
             } else {
-                const created = await createDonationItem(user.id, {
-                    ...data,
-                    active: true,
-                });
+                const created = await createDonationItem(user.id, itemData);
                 setItems([...items, created]);
             }
             setShowModal(false);
@@ -528,6 +545,7 @@ export function ManageItemsPage() {
             {showModal && (
                 <ItemFormModal
                     initial={editItem}
+                    campaigns={campaigns}
                     onSave={saveItem}
                     onClose={() => {
                         setShowModal(false);
@@ -560,7 +578,7 @@ function Modal({ title, onClose, children }) {
 }
 
 // ─── Item Form Modal ───────────────────────────────────────────────────────────
-function ItemFormModal({ initial, onSave, onClose }) {
+function ItemFormModal({ initial, onSave, onClose, campaigns = [] }) {
     const [form, setForm] = useState({
         name: initial?.name || "",
         category: initial?.category || "",
@@ -568,6 +586,7 @@ function ItemFormModal({ initial, onSave, onClose }) {
         available: initial?.available || "",
         impact: initial?.impact || "",
         tag: initial?.tag || "",
+        campaignId: initial?.campaign_id || "",
         active: initial?.active ?? true,
     });
     const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
@@ -620,6 +639,25 @@ function ItemFormModal({ initial, onSave, onClose }) {
                         ].map((c) => (
                             <option key={c} value={c}>
                                 {c}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-1">
+                        Vincular a campaña (opcional)
+                    </label>
+                    <select
+                        value={form.campaignId}
+                        onChange={(e) => set("campaignId")(e.target.value)}
+                        className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="">
+                            Sin campaña (producto independiente)
+                        </option>
+                        {campaigns.map((c) => (
+                            <option key={c.id} value={c.id}>
+                                {c.title}
                             </option>
                         ))}
                     </select>
@@ -1159,19 +1197,73 @@ export function ManageCampaignsPage() {
 export function FoundationProfilePage() {
     const { user } = useAuth();
     const [editing, setEditing] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        totalBeneficiarios: 0,
+        campaignasEjecutadas: 0,
+        recursosEntregados: 0,
+        transparency: "Media",
+    });
     const [form, setForm] = useState({
-        name: user?.name || "Fundación Educativa",
-        description:
-            "Fundación Educativa trabaja desde 2010 para garantizar el acceso a educación de calidad en comunidades vulnerables.",
-        mission:
-            "Promover el derecho a la educación de niños y jóvenes en situación de vulnerabilidad.",
-        vision: "Un país donde todos los niños tengan acceso a educación de calidad.",
-        category: "Educación",
-        coverage: "Nacional",
-        contact: "contacto@fundacioneducativa.org",
-        website: "www.fundacioneducativa.org",
+        name: "",
+        description: "",
+        mission: "",
+        vision: "",
+        category: "",
+        coverage: "",
+        contact: "",
+        website: "",
     });
     const [draft, setDraft] = useState(form);
+
+    useEffect(() => {
+        const loadProfile = async () => {
+            if (!user?.id) return;
+            try {
+                setLoading(true);
+                const [profile, donationsData] = await Promise.all([
+                    getFoundationProfile(user.id),
+                    getFoundationDonations(user.id),
+                ]);
+
+                if (profile) {
+                    const profileData = {
+                        name: profile.legal_name || profile.name || "",
+                        description: profile.description || "",
+                        mission: profile.mission || "",
+                        vision: profile.vision || "",
+                        category: profile.category || "",
+                        coverage: profile.coverage || "",
+                        contact:
+                            profile.institutional_email ||
+                            profile.contact ||
+                            "",
+                        website: profile.website || "",
+                    };
+                    setForm(profileData);
+                    setDraft(profileData);
+
+                    // Calculate total from donations
+                    const totalRaised = (donationsData || []).reduce(
+                        (sum, d) => sum + (d.amount || 0),
+                        0,
+                    );
+
+                    setStats({
+                        totalBeneficiarios: profile.total_beneficiarios || 0,
+                        campaignasEjecutadas: profile.campaigns_executed || 0,
+                        recursosEntregados: totalRaised,
+                        transparency: profile.transparency || "Media",
+                    });
+                }
+            } catch (err) {
+                console.error("Error loading foundation profile:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadProfile();
+    }, [user?.id]);
 
     const startEdit = () => {
         setDraft(form);
@@ -1181,9 +1273,26 @@ export function FoundationProfilePage() {
         setDraft(form);
         setEditing(false);
     };
-    const saveEdit = () => {
-        setForm(draft);
-        setEditing(false);
+    const saveEdit = async () => {
+        try {
+            if (user?.id) {
+                await updateFoundationProfile(user.id, {
+                    legal_name: draft.name,
+                    description: draft.description,
+                    mission: draft.mission,
+                    vision: draft.vision,
+                    category: draft.category,
+                    coverage: draft.coverage,
+                    institutional_email: draft.contact,
+                    website: draft.website,
+                });
+            }
+            setForm(draft);
+            setEditing(false);
+        } catch (err) {
+            console.error("Error saving profile:", err);
+            alert("Error al guardar el perfil");
+        }
     };
 
     return (
@@ -1192,188 +1301,408 @@ export function FoundationProfilePage() {
                 Perfil de Fundación
             </div>
 
-            {/* Header */}
-            <div className="bg-gray-50 rounded-2xl p-6 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-5">
-                <div className="w-20 h-20 rounded-2xl bg-blue-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-3xl font-bold text-white">FE</span>
-                </div>
-                <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-2xl font-bold text-gray-900">
-                            {form.name}
-                        </h1>
-                        <CheckCircleIcon className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                        <Badge label={form.category} />
-                        <span className="text-sm text-gray-500">
-                            • {user?.location || "Buenos Aires, Argentina"}
-                        </span>
-                    </div>
-                    <button
-                        onClick={startEdit}
-                        className="mt-3 text-sm border border-gray-300 px-4 py-1.5 rounded-lg hover:bg-white font-medium"
-                    >
-                        {editing ? "Cancelar edición" : "Editar perfil"}
-                    </button>
-                </div>
-            </div>
-
-            {editing ? (
-                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-4 mb-6">
-                    <h2 className="font-bold text-gray-900 mb-2">
-                        Editar información
-                    </h2>
-                    {[
-                        { key: "name", label: "Nombre", type: "input" },
-                        {
-                            key: "description",
-                            label: "Descripción",
-                            type: "textarea",
-                        },
-                        { key: "mission", label: "Misión", type: "textarea" },
-                        { key: "vision", label: "Visión", type: "textarea" },
-                        {
-                            key: "contact",
-                            label: "Email de contacto",
-                            type: "input",
-                        },
-                        { key: "website", label: "Sitio web", type: "input" },
-                    ].map((f) => (
-                        <div key={f.key}>
-                            <label className="text-sm font-medium text-gray-700 block mb-1">
-                                {f.label}
-                            </label>
-                            {f.type === "textarea" ? (
-                                <textarea
-                                    value={draft[f.key]}
-                                    onChange={(e) =>
-                                        setDraft((prev) => ({
-                                            ...prev,
-                                            [f.key]: e.target.value,
-                                        }))
-                                    }
-                                    className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-20 resize-none"
-                                />
-                            ) : (
-                                <input
-                                    value={draft[f.key]}
-                                    onChange={(e) =>
-                                        setDraft((prev) => ({
-                                            ...prev,
-                                            [f.key]: e.target.value,
-                                        }))
-                                    }
-                                    className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            )}
-                        </div>
-                    ))}
-                    <div className="flex justify-end gap-3 pt-2">
-                        <button
-                            onClick={cancelEdit}
-                            className="border border-gray-300 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            onClick={saveEdit}
-                            className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700"
-                        >
-                            Guardar cambios
-                        </button>
-                    </div>
+            {loading ? (
+                <div className="text-center py-8">
+                    <p className="text-gray-500">Cargando perfil...</p>
                 </div>
             ) : (
                 <>
-                    {/* About */}
-                    <section className="mb-6">
-                        <h2 className="text-xl font-bold text-gray-900 mb-4">
-                            Sobre nosotros
-                        </h2>
-                        <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                            {form.description}
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <p className="text-sm font-semibold text-gray-900">
-                                    Misión
-                                </p>
-                                <p className="text-sm text-gray-500">
-                                    {form.mission}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm font-semibold text-gray-900">
-                                    Visión
-                                </p>
-                                <p className="text-sm text-gray-500">
-                                    {form.vision}
-                                </p>
-                            </div>
+                    {/* Header */}
+                    <div className="bg-gray-50 rounded-2xl p-6 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                        <div className="w-20 h-20 rounded-2xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+                            <span className="text-3xl font-bold text-white">
+                                {form.name.substring(0, 2).toUpperCase()}
+                            </span>
                         </div>
-                    </section>
-
-                    {/* Contact */}
-                    <section className="mb-6">
-                        <h2 className="text-xl font-bold text-gray-900 mb-4">
-                            Información de contacto
-                        </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {[
-                                { label: "Cobertura", value: form.coverage },
-                                { label: "Contacto", value: form.contact },
-                                { label: "Sitio web", value: form.website },
-                                { label: "Categoría", value: form.category },
-                            ].map((item) => (
-                                <div
-                                    key={item.label}
-                                    className="border border-gray-100 rounded-xl p-4 bg-white"
-                                >
-                                    <p className="text-xs text-gray-400 mb-1">
-                                        {item.label}
-                                    </p>
-                                    <p className="text-sm font-medium text-gray-900">
-                                        {item.value}
-                                    </p>
-                                </div>
-                            ))}
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-2xl font-bold text-gray-900">
+                                    {form.name}
+                                </h1>
+                                <CheckCircleIcon className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                                <Badge label={form.category} />
+                                <span className="text-sm text-gray-500">
+                                    • {user?.location || ""}
+                                </span>
+                            </div>
+                            <button
+                                onClick={startEdit}
+                                className="mt-3 text-sm border border-gray-300 px-4 py-1.5 rounded-lg hover:bg-white font-medium"
+                            >
+                                {editing ? "Cancelar edición" : "Editar perfil"}
+                            </button>
                         </div>
-                    </section>
+                    </div>
 
-                    {/* Stats */}
-                    <section>
-                        <h2 className="text-xl font-bold text-gray-900 mb-4">
-                            Impacto y transparencia
-                        </h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {editing ? (
+                        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-4 mb-6">
+                            <h2 className="font-bold text-gray-900 mb-2">
+                                Editar información
+                            </h2>
                             {[
-                                { label: "Beneficiarios", value: "2.450" },
-                                { label: "Campañas ejecutadas", value: "87" },
+                                { key: "name", label: "Nombre", type: "input" },
                                 {
-                                    label: "Recursos entregados",
-                                    value: "$8.5M",
+                                    key: "description",
+                                    label: "Descripción",
+                                    type: "textarea",
                                 },
-                                { label: "Transparencia", value: "Alta" },
-                            ].map((s) => (
-                                <div
-                                    key={s.label}
-                                    className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm text-center"
-                                >
-                                    <p className="text-xs text-gray-400 mb-1">
-                                        {s.label}
-                                    </p>
-                                    <p className="text-xl font-bold text-gray-900">
-                                        {s.value}
-                                    </p>
+                                {
+                                    key: "mission",
+                                    label: "Misión",
+                                    type: "textarea",
+                                },
+                                {
+                                    key: "vision",
+                                    label: "Visión",
+                                    type: "textarea",
+                                },
+                                {
+                                    key: "contact",
+                                    label: "Email de contacto",
+                                    type: "input",
+                                },
+                                {
+                                    key: "website",
+                                    label: "Sitio web",
+                                    type: "input",
+                                },
+                            ].map((f) => (
+                                <div key={f.key}>
+                                    <label className="text-sm font-medium text-gray-700 block mb-1">
+                                        {f.label}
+                                    </label>
+                                    {f.type === "textarea" ? (
+                                        <textarea
+                                            value={draft[f.key]}
+                                            onChange={(e) =>
+                                                setDraft((prev) => ({
+                                                    ...prev,
+                                                    [f.key]: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-20 resize-none"
+                                        />
+                                    ) : (
+                                        <input
+                                            value={draft[f.key]}
+                                            onChange={(e) =>
+                                                setDraft((prev) => ({
+                                                    ...prev,
+                                                    [f.key]: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    )}
                                 </div>
                             ))}
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    onClick={cancelEdit}
+                                    className="border border-gray-300 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={saveEdit}
+                                    className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700"
+                                >
+                                    Guardar cambios
+                                </button>
+                            </div>
                         </div>
-                    </section>
+                    ) : (
+                        <>
+                            {/* About */}
+                            <section className="mb-6">
+                                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                                    Sobre nosotros
+                                </h2>
+                                <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                                    {form.description}
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900">
+                                            Misión
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            {form.mission}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900">
+                                            Visión
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            {form.vision}
+                                        </p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Contact */}
+                            <section className="mb-6">
+                                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                                    Información de contacto
+                                </h2>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {[
+                                        {
+                                            label: "Cobertura",
+                                            value: form.coverage,
+                                        },
+                                        {
+                                            label: "Contacto",
+                                            value: form.contact,
+                                        },
+                                        {
+                                            label: "Sitio web",
+                                            value: form.website,
+                                        },
+                                        {
+                                            label: "Categoría",
+                                            value: form.category,
+                                        },
+                                    ].map((item) => (
+                                        <div
+                                            key={item.label}
+                                            className="border border-gray-100 rounded-xl p-4 bg-white"
+                                        >
+                                            <p className="text-xs text-gray-400 mb-1">
+                                                {item.label}
+                                            </p>
+                                            <p className="text-sm font-medium text-gray-900">
+                                                {item.value}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+
+                            {/* Stats */}
+                            <section>
+                                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                                    Impacto y transparencia
+                                </h2>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    {[
+                                        {
+                                            label: "Beneficiarios",
+                                            value: stats.totalBeneficiarios.toLocaleString(
+                                                "es",
+                                            ),
+                                        },
+                                        {
+                                            label: "Campañas ejecutadas",
+                                            value: stats.campaignasEjecutadas,
+                                        },
+                                        {
+                                            label: "Recursos entregados",
+                                            value: formatCompactCurrency(
+                                                stats.recursosEntregados,
+                                            ),
+                                        },
+                                        {
+                                            label: "Transparencia",
+                                            value: stats.transparency,
+                                        },
+                                    ].map((s) => (
+                                        <div
+                                            key={s.label}
+                                            className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm text-center"
+                                        >
+                                            <p className="text-xs text-gray-400 mb-1">
+                                                {s.label}
+                                            </p>
+                                            <p className="text-xl font-bold text-gray-900">
+                                                {s.value}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        </>
+                    )}
                 </>
             )}
         </div>
     );
 }
-// =========================================================================================================
-// TODO: Revisar todo el flujo de edición de perfil y creación/edición de campañas, y conectar con el backend para guardar cambios reales una vez esté listo. También revisar que los datos mostrados (como el impacto y estadísticas) se correspondan con datos reales del usuario autenticado.
+
+// ─── Donations Received Page ────────────────────────────────────────────────────
+export function FoundationDonationsPage() {
+    const { user } = useAuth();
+    const [donations, setDonations] = useState([]);
+    const [stats, setStats] = useState({
+        totalRecaudado: 0,
+        totalDonantes: 0,
+    });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadDonations = async () => {
+            if (!user?.id) return;
+            try {
+                setLoading(true);
+                const [donationsData, donorCount] = await Promise.all([
+                    getFoundationDonations(user.id),
+                    getFoundationDonorCount(user.id),
+                ]);
+
+                setDonations(donationsData || []);
+                const totalRaised = (donationsData || []).reduce(
+                    (sum, d) => sum + (d.amount || 0),
+                    0,
+                );
+
+                setStats({
+                    totalRecaudado: totalRaised,
+                    totalDonantes: donorCount,
+                });
+            } catch (err) {
+                console.error("Error loading donations:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadDonations();
+    }, [user?.id]);
+
+    return (
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                Donaciones recibidas
+            </h1>
+            <p className="text-gray-500 text-sm mb-6">
+                Historial completo de donaciones a tu fundación
+            </p>
+
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+                {[
+                    {
+                        label: "Total recaudado",
+                        value: `$${(stats.totalRecaudado || 0).toLocaleString("es")}`,
+                        color: "text-blue-600",
+                    },
+                    {
+                        label: "Donaciones recibidas",
+                        value: donations.length,
+                        color: "text-gray-900",
+                    },
+                    {
+                        label: "Donantes únicos",
+                        value: stats.totalDonantes,
+                        color: "text-gray-900",
+                    },
+                ].map((s) => (
+                    <div
+                        key={s.label}
+                        className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm"
+                    >
+                        <p className="text-xs text-gray-500 mb-1">{s.label}</p>
+                        <p className={`text-2xl font-bold ${s.color}`}>
+                            {s.value}
+                        </p>
+                    </div>
+                ))}
+            </div>
+
+            {/* Donations table */}
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase border-b border-gray-100">
+                            <tr>
+                                {[
+                                    "Donante",
+                                    "Ítem",
+                                    "Campaña",
+                                    "Fecha",
+                                    "Monto",
+                                    "Estado",
+                                ].map((h) => (
+                                    <th
+                                        key={h}
+                                        className="text-left px-4 py-3 font-medium"
+                                    >
+                                        {h}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {loading ? (
+                                <tr>
+                                    <td
+                                        colSpan="6"
+                                        className="px-4 py-8 text-center text-gray-500"
+                                    >
+                                        Cargando donaciones...
+                                    </td>
+                                </tr>
+                            ) : donations.length === 0 ? (
+                                <tr>
+                                    <td
+                                        colSpan="6"
+                                        className="px-4 py-8 text-center text-gray-500"
+                                    >
+                                        No hay donaciones registradas
+                                    </td>
+                                </tr>
+                            ) : (
+                                donations.map((donation, i) => (
+                                    <tr key={i} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 font-medium text-gray-900">
+                                            {donation.anonymous
+                                                ? "Anónimo"
+                                                : donation.donors?.full_name ||
+                                                  "Usuario"}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-600">
+                                            {donation.donation_items?.name ||
+                                                "Ítem"}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-500 text-xs">
+                                            {donation.campaign_id
+                                                ? "Campaña"
+                                                : "Producto"}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-500">
+                                            {new Date(
+                                                donation.created_at,
+                                            ).toLocaleDateString("es")}
+                                        </td>
+                                        <td className="px-4 py-3 font-semibold text-gray-900">
+                                            $
+                                            {Number(
+                                                donation.amount,
+                                            ).toLocaleString("es")}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span
+                                                className={`px-2 py-1 rounded-full text-xs font-medium ${donation.status === "confirmed" ? "bg-green-100 text-green-700" : donation.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-700"}`}
+                                            >
+                                                {donation.status ===
+                                                "confirmed"
+                                                    ? "Completado"
+                                                    : donation.status ===
+                                                      "pending"
+                                                      ? "Pendiente"
+                                                      : donation.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+}
